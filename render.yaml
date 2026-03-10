@@ -5,8 +5,8 @@ services:
     env: docker
     region: frankfurt
     plan: free
-    dockerContext: backend
-    dockerfilePath: Dockerfile
+    dockerContext: .
+    dockerfilePath: backend/Dockerfile
     envVars:
       - key: SPRING_DATASOURCE_URL
         sync: false
@@ -34,5 +34,6 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
 
 
