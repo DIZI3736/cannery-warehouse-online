@@ -428,9 +428,7 @@ function App() {
                                 <td>
                                     {user.role === 'ACCOUNTANT' ? (
                                         <>
-                                            <input type="number" min="0" className={`form-control form-control-sm border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
-                                                defaultValue={p.price} 
-                                                onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                            <input type="number" min="0" className={`form-control form-control-sm border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
                                                 onBlur={(e)=>updatePrice(p.id, e.target.value)} />
                                             {editingErrorId === p.id && <div className="text-danger small fw-bold" style={{fontSize: '0.7rem'}}>⚠️ {productError}</div>}
                                         </>
@@ -459,3 +457,4 @@ function App() {
 }
 
 export default App;
+
