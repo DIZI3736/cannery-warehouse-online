@@ -22,7 +22,7 @@ services:
         value: update
 
   # Frontend Service (Vite Static Site)
-  - type: static
+  - type: static_site
     name: cannery-frontend
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
