@@ -30,7 +30,7 @@ public class DataInitializer {
                 Category cat3 = saveCat(categoryRepository, "В томате");
 
                 createProd(productRepository, "Шпроты в масле", cat2, 1000, "145.00", "https://bing.com/th?id=OSK.df5bb4e3cab142643a0fc35d55519b5c");
-                createProd(productRepository, "Килька в томате", cat3, 50, "85.00", "https://cdn-irec.r-99.com/sites/default/files/product-images/10297/bP5uIVsUczg80radKJOOxQ.jpg");
+                createProd(productRepository, "Килька в томате", cat3, 50, "85.00", "https://api.e-dostavka.by/UserFiles/images/catalog/Goods/1857/00511857/norm/00511857.n_1.png");
                 createProd(productRepository, "Сайра натуральная", cat1, 300, "185.50", "https://ir.ozone.ru/s3/multimedia-k/c1000/6854583164.jpg");
                 createProd(productRepository, "Горбуша паштет", cat1, 90, "215.00", "https://ir.ozone.ru/s3/multimedia-1-r/c1000/7085548503.jpg");
                 createProd(productRepository, "Печень трески", cat1, 45, "450.00", "https://ir.ozone.ru/s3/multimedia-1-8/c1000/7042638248.jpg");

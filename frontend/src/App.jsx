@@ -23,11 +23,27 @@ function App() {
 
   const authHeader = () => ({ headers: { Authorization: localStorage.getItem('token') } });
 
-  const login = async (e) => {
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const login = async (e, quickUser = null, quickPass = '1234') => {
     if (e) e.preventDefault();
-    console.log("Attempting login for:", username);
+    
+    const finalUsername = (quickUser || username).trim().toLowerCase();
+    const finalPassword = quickUser ? quickPass : password;
+
+    if (!finalUsername) {
+        setLoginError('Введите логин');
+        return;
+    }
+
+    setLoginLoading(true);
     setLoginError('');
-    const token = 'Basic ' + btoa(unescape(encodeURIComponent(username + ':' + password)));
+    
+    console.log("Attempting login for:", finalUsername);
+    
+    // Proper way to handle UTF-8 in Basic Auth
+    const token = 'Basic ' + btoa(encodeURIComponent(finalUsername + ':' + finalPassword).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+    
     try {
       const res = await axios.get(API_URL + '/api/auth/me', { headers: { Authorization: token } });
       console.log("Login successful:", res.data);
@@ -35,18 +51,20 @@ function App() {
       setUser(res.data);
       fetchData(token);
     } catch (err) { 
-        console.error("Login error:", err);
+        console.error("Login error details:", err);
         if (err.response && err.response.status === 401) {
             setLoginError('Неверный логин или пароль!');
         } else if (err.message === "Network Error") {
-            setLoginError('Сервер бэкенда не запущен или недоступен');
+            setLoginError('Сервер недоступен (Network Error). Проверьте интернет или URL бэкенда.');
         } else {
-            setLoginError('Ошибка: ' + (err.response?.data?.message || err.message));
+            setLoginError('Ошибка входа: ' + (err.response?.data?.message || err.message));
         }
+    } finally {
+        setLoginLoading(false);
     }
   };
 
-  const logout = () => { localStorage.removeItem('token'); setUser(null); setLoginError(''); };
+  const logout = () => { localStorage.removeItem('token'); setUser(null); setLoginError(''); setUsername(''); setPassword('1234'); };
 
   const fetchData = async (currentToken) => {
     const token = currentToken || localStorage.getItem('token');
@@ -169,9 +187,9 @@ function App() {
                 'Content-Type': 'multipart/form-data'
             }
         });
-        alert('Данные успешно импортированы!');
+        console.log('Данные успешно импортированы');
         fetchData();
-    } catch (err) { alert('Ошибка при импорте. Проверьте формат файла.'); }
+    } catch (err) { console.error('Ошибка при импорте'); }
   };
 
   const uploadPhoto = async (e, p = null) => {
@@ -235,13 +253,15 @@ function App() {
               </div>
             )}
             
-            <button className="btn btn-primary btn-lg w-100 rounded-3 shadow-sm fw-bold">ВОЙТИ</button>
+            <button className="btn btn-primary btn-lg w-100 rounded-3 shadow-sm fw-bold" disabled={loginLoading}>
+                {loginLoading ? 'ВХОД...' : 'ВОЙТИ'}
+            </button>
           </form>
           <div className="mt-5 pt-4 border-top">
              <div className="row g-2">
-                <div className="col-12"><button className="btn btn-outline-success w-100 fw-bold" onClick={() => setUsername('storekeeper')}>КЛАДОВЩИК</button></div>
-                <div className="col-12"><button className="btn btn-outline-primary w-100 fw-bold" onClick={() => setUsername('manager')}>МЕНЕДЖЕР</button></div>
-                <div className="col-12"><button className="btn btn-outline-info w-100 fw-bold" onClick={() => setUsername('accountant')}>БУХГАЛТЕР</button></div>
+                <div className="col-12"><button className="btn btn-outline-success w-100 fw-bold" onClick={() => login(null, 'storekeeper')}>КЛАДОВЩИК</button></div>
+                <div className="col-12"><button className="btn btn-outline-primary w-100 fw-bold" onClick={() => login(null, 'manager')}>МЕНЕДЖЕР</button></div>
+                <div className="col-12"><button className="btn btn-outline-info w-100 fw-bold" onClick={() => login(null, 'accountant')}>БУХГАЛТЕР</button></div>
              </div>
           </div>
         </div>
@@ -373,9 +393,14 @@ function App() {
                 <button className="btn btn-outline-success rounded-pill px-3 fw-bold" onClick={exportToExcel} title="Экспорт в Excel">
                     📥 ЭКСПОРТ
                 </button>
-                <label className="btn btn-outline-primary rounded-pill px-3 fw-bold mb-0" title="Импорт из Excel">
+                <label className="btn btn-outline-primary rounded-pill px-3 fw-bold mb-0" style={{ cursor: 'pointer' }} title="Импорт из Excel">
                     📤 ИМПОРТ
-                    <input type="file" hidden accept=".xlsx, .xls" onChange={handleImport} />
+                    <input 
+                        type="file" 
+                        style={{ display: 'none' }} 
+                        accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                        onChange={handleImport} 
+                    />
                 </label>
             </div>
         </div>
@@ -395,7 +420,7 @@ function App() {
                 <tbody>
                     {products.map(p => (
                         <tr key={p.id}>
-                            <td><div className="product-img-container"><img src={p.photoUrl} className="product-img" onError={e=>e.target.src='https://cdn-icons-png.flaticon.com/512/2271/2271068.png'}/></div></td>
+                            <td><div className="product-img-container"><img src={p.photoUrl} className="product-img" onError={e=>e.target.src='https://cdn-icons-png.flaticon.com/512/1170/1170628.png'}/></div></td>
                             <td>
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" defaultValue={p.name} onBlur={(e)=>updateProduct({...p, name: e.target.value})} />
