@@ -470,9 +470,9 @@ function App() {
                                 <td>
                                     {user.role === 'ACCOUNTANT' ? (
                                         <div className="d-flex align-items-center">
-                                            <input type="number" min="0" className={`form-control form-control-sm border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} style={{maxWidth: '80px'}} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                            <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
                                                 onBlur={(e)=>updatePrice(p.id, e.target.value)} />
-                                            <span className="ms-1 fw-bold text-primary">₽</span>
+                                            <span className="ms-1 fw-bold">₽</span>
                                         </div>
                                     ) : <span className="fw-bold">{p.price} ₽</span>}
                                 </td>
