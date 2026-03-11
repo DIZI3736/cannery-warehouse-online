@@ -97,14 +97,8 @@ public class ExcelService {
                         newCat.setName(catName);
                         return categoryRepo.save(newCat);
                     }));
-                } else if (product.getCategory() == null) {
-                    // Default category if missing
-                    String defCat = "Прочее";
-                    product.setCategory(categoryRepo.findByName(defCat).orElseGet(() -> {
-                        com.cannery.warehouse.model.Category newCat = new com.cannery.warehouse.model.Category();
-                        newCat.setName(defCat);
-                        return categoryRepo.save(newCat);
-                    }));
+                } else {
+                    product.setCategory(null);
                 }
                 
                 if (currentRow.getCell(3) != null && currentRow.getCell(3).getCellType() == CellType.NUMERIC) {
