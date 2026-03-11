@@ -144,18 +144,19 @@ function App() {
       if (qVal < 0) {
           setEditingErrorId(p.id);
           setProductError('Минус нельзя!');
+          setIsEditing(false); // Снимаем блок даже при ошибке
           fetchData(); 
           return;
       }
       
-      // Сразу обновляем локальное состояние, чтобы не было "прыжков"
+      // Сначала обновляем стейт, потом снимаем блок редактирования
       setProducts(prev => prev.map(item => item.id === p.id ? { ...item, quantity: qVal } : item));
+      setTimeout(() => setIsEditing(false), 100); // Небольшая пауза, чтобы стейт "закрепился"
 
       const catId = p.category?.id || p.categoryId;
       const productToSend = { ...p, quantity: qVal, category: { id: catId ? parseInt(catId) : null } };
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
-          // Не вызываем fetchData() сразу, чтобы база успела обновиться
       } catch (err) { 
           setEditingErrorId(p.id);
           setProductError('Ошибка'); 
@@ -175,15 +176,16 @@ function App() {
       if (pVal < 0) {
           setEditingErrorId(id);
           setProductError('Минус нельзя!');
+          setIsEditing(false);
           return fetchData();
       }
 
-      // Сразу обновляем локальное состояние
+      // Сначала стейт, потом снимаем блок
       setProducts(prev => prev.map(item => item.id === id ? { ...item, price: pVal } : item));
+      setTimeout(() => setIsEditing(false), 100);
 
       try {
           await axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader());
-          // Не вызываем fetchData() сразу
       } catch (err) { 
           setEditingErrorId(id);
           setProductError('Ошибка');
