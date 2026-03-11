@@ -446,7 +446,10 @@ function App() {
                             <td><div className="product-img-container" style={{width: '40px', height: '40px'}}><img src={p.photoUrl} className="product-img" style={{width: '40px', height: '40px'}} onError={e=>e.target.src='https://cdn-icons-png.flaticon.com/512/1170/1170628.png'}/></div></td>
                             <td>
                                 {user.role === 'STOREKEEPER' ? (
-                                    <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" defaultValue={p.name} onBlur={(e)=>updateProduct({...p, name: e.target.value})} />
+                                    <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" 
+                                        value={p.name} 
+                                        onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, name: e.target.value} : item))}
+                                        onBlur={(e)=>updateProduct({...p, name: e.target.value})} />
                                 ) : <div className="fw-bold">{p.name}</div>}
                                 <div className="d-md-none small text-muted">{p.categoryName}</div>
                             </td>
@@ -462,8 +465,9 @@ function App() {
                                 {user.role === 'STOREKEEPER' ? (
                                     <>
                                         <input type="number" min="0" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
-                                            defaultValue={p.quantity} 
+                                            value={p.quantity} 
                                             onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                            onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, quantity: e.target.value} : item))}
                                             onBlur={(e)=>updateProduct({...p, quantity: parseInt(e.target.value)})} />
                                         {editingErrorId === p.id && <div className="text-danger small fw-bold" style={{fontSize: '0.65rem'}}>⚠️</div>}
                                     </>
@@ -477,7 +481,10 @@ function App() {
                                 <td>
                                     {user.role === 'ACCOUNTANT' ? (
                                         <div className="d-flex align-items-center">
-                                            <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                            <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
+                                                value={p.price || ''} 
+                                                onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                                onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, price: e.target.value} : item))}
                                                 onBlur={(e)=>updatePrice(p.id, e.target.value)} />
                                             <span className="ms-1 fw-bold">₽</span>
                                         </div>
