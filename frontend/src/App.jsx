@@ -466,6 +466,7 @@ function App() {
                                     </span>
                                 )}
                             </td>
+                            {user.role !== 'STOREKEEPER' && (
                                 <td>
                                     {user.role === 'ACCOUNTANT' ? (
                                         <div className="input-group input-group-sm">
@@ -475,6 +476,7 @@ function App() {
                                         </div>
                                     ) : <span className="fw-bold">{p.price} ₽</span>}
                                 </td>
+                            )}
                             <td className="text-end pe-2 pe-md-4">
                                 {user.role === 'STOREKEEPER' ? (
                                     <div className="d-flex gap-1 justify-content-end align-items-center">
