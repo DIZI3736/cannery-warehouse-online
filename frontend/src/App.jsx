@@ -466,16 +466,15 @@ function App() {
                                     </span>
                                 )}
                             </td>
-                            {user.role !== 'STOREKEEPER' && (
                                 <td>
                                     {user.role === 'ACCOUNTANT' ? (
-                                        <>
-                                            <input type="number" min="0" className={`form-control form-control-sm border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                        <div className="input-group input-group-sm">
+                                            <input type="number" min="0" className={`form-control border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
                                                 onBlur={(e)=>updatePrice(p.id, e.target.value)} />
-                                        </>
-                                    ) : <span className="fw-bold">{p.price}</span>}
+                                            <span className="input-group-text bg-primary text-white border-primary fw-bold">₽</span>
+                                        </div>
+                                    ) : <span className="fw-bold">{p.price} ₽</span>}
                                 </td>
-                            )}
                             <td className="text-end pe-2 pe-md-4">
                                 {user.role === 'STOREKEEPER' ? (
                                     <div className="d-flex gap-1 justify-content-end align-items-center">
