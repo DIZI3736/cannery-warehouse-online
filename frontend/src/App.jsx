@@ -369,6 +369,9 @@ function App() {
                             )}
                             <div className="input-group bg-light rounded-3 overflow-hidden">
                                 <input className="form-control border-0 bg-transparent" placeholder="Ссылка или файл..." value={newProduct.photoUrl} onChange={e=>{setNewProduct({...newProduct, photoUrl: e.target.value}); setProductError('');}} />
+                                <button className="btn btn-light border-0 d-flex align-items-center px-2" onClick={() => { const url = prompt("Введите ссылку на фото:"); if(url) { setNewProduct({...newProduct, photoUrl: url}); setProductError(''); } }} title="Добавить по ссылке">
+                                    🔗
+                                </button>
                                 <label className="btn btn-light border-0 d-flex align-items-center px-2" title="Загрузить файл с диска">
                                     📁<input type="file" hidden accept="image/*" onChange={(e) => uploadPhoto(e)} />
                                 </label>
@@ -465,6 +468,9 @@ function App() {
                             <td className="text-end pe-2 pe-md-4">
                                 {user.role === 'STOREKEEPER' ? (
                                     <div className="d-flex gap-1 justify-content-end align-items-center">
+                                        <button className="btn btn-xs btn-light rounded-circle" onClick={() => { const url = prompt("Введите ссылку на фото:"); if(url) updateProduct({...p, photoUrl: url}); }} title="Добавить по ссылке" style={{padding: '2px 5px', fontSize: '10px'}}>
+                                            🔗
+                                        </button>
                                         <label className="btn btn-xs btn-light rounded-circle mb-0" title="Загрузить фото" style={{padding: '2px 5px', fontSize: '10px'}}>
                                             📁<input type="file" hidden accept="image/*" onChange={(e) => uploadPhoto(e, p)} />
                                         </label>
