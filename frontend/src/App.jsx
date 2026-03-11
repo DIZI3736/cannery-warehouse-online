@@ -15,6 +15,7 @@ function App() {
   const [loginError, setLoginError] = useState('');
   const [productError, setProductError] = useState('');
   const [editingErrorId, setEditingErrorId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const roleRu = (role) => {
     const roles = { 'STOREKEEPER': 'Кладовщик', 'SALES_MANAGER': 'Менеджер сбыта', 'ACCOUNTANT': 'Бухгалтер' };
@@ -88,8 +89,10 @@ function App() {
       const pRes = await axios.get(`${API_URL}/api/products?${params.toString()}`, headers);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
       
-      // Динамическое обновление: меняем состояние только если данные реально изменились
+      // Динамическое обновление: меняем состояние только если данные реально изменились 
+      // И если пользователь в данный момент ничего не редактирует
       setProducts(prev => {
+          if (isEditing) return prev; 
           if (JSON.stringify(prev) !== JSON.stringify(sortedProducts)) {
               return sortedProducts;
           }
@@ -459,8 +462,9 @@ function App() {
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" 
                                         value={p.name} 
+                                        onFocus={() => setIsEditing(true)}
                                         onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, name: e.target.value} : item))}
-                                        onBlur={(e)=>updateProduct({...p, name: e.target.value})} />
+                                        onBlur={(e) => { setIsEditing(false); updateProduct({...p, name: e.target.value}); }} />
                                 ) : <div className="fw-bold">{p.name}</div>}
                                 <div className="d-md-none small text-muted">{p.categoryName}</div>
                             </td>
@@ -477,9 +481,9 @@ function App() {
                                     <>
                                         <input type="number" min="0" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
                                             value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
-                                            onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                            onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
                                             onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, quantity: e.target.value} : item))}
-                                            onBlur={(e)=>updateProduct({...p, quantity: parseInt(e.target.value)})} />
+                                            onBlur={(e) => { setIsEditing(false); updateProduct({...p, quantity: parseInt(e.target.value)}); }} />
                                         {editingErrorId === p.id && <div className="text-danger small fw-bold" style={{fontSize: '0.65rem'}}>⚠️</div>}
                                     </>
                                 ) : (
@@ -494,9 +498,9 @@ function App() {
                                         <div className="d-flex align-items-center">
                                             <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
                                                 value={p.price !== null && p.price !== undefined ? p.price : ''} 
-                                                onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                                onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
                                                 onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, price: e.target.value} : item))}
-                                                onBlur={(e)=>updatePrice(p.id, e.target.value)} />
+                                                onBlur={(e) => { setIsEditing(false); updatePrice(p.id, e.target.value); }} />
                                             <span className="ms-1 fw-bold">₽</span>
                                         </div>
                                     ) : <span className="fw-bold">{p.price !== null && p.price !== undefined ? p.price : 0} ₽</span>}
