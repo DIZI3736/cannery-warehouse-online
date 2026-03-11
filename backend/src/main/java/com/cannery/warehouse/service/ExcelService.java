@@ -90,21 +90,33 @@ public class ExcelService {
                     product.setName(name);
                 }
                 
-                if (currentRow.getCell(2) != null) {
-                    String catName = currentRow.getCell(2).getStringCellValue();
+                if (currentRow.getCell(2) != null && !currentRow.getCell(2).getStringCellValue().trim().isEmpty()) {
+                    String catName = currentRow.getCell(2).getStringCellValue().trim();
                     product.setCategory(categoryRepo.findByName(catName).orElseGet(() -> {
                         com.cannery.warehouse.model.Category newCat = new com.cannery.warehouse.model.Category();
                         newCat.setName(catName);
                         return categoryRepo.save(newCat);
                     }));
+                } else if (product.getCategory() == null) {
+                    // Default category if missing
+                    String defCat = "Прочее";
+                    product.setCategory(categoryRepo.findByName(defCat).orElseGet(() -> {
+                        com.cannery.warehouse.model.Category newCat = new com.cannery.warehouse.model.Category();
+                        newCat.setName(defCat);
+                        return categoryRepo.save(newCat);
+                    }));
                 }
                 
-                if (currentRow.getCell(3) != null) {
+                if (currentRow.getCell(3) != null && currentRow.getCell(3).getCellType() == CellType.NUMERIC) {
                     product.setQuantity((int) currentRow.getCell(3).getNumericCellValue());
+                } else if (product.getQuantity() == null) {
+                    product.setQuantity(0);
                 }
                 
-                if (currentRow.getLastCellNum() > 4 && currentRow.getCell(4) != null) {
+                if (currentRow.getLastCellNum() > 4 && currentRow.getCell(4) != null && currentRow.getCell(4).getCellType() == CellType.NUMERIC) {
                     product.setPrice(BigDecimal.valueOf(currentRow.getCell(4).getNumericCellValue()));
+                } else if (product.getPrice() == null) {
+                    product.setPrice(BigDecimal.ZERO);
                 }
 
                 repository.save(product);

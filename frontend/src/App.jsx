@@ -77,7 +77,7 @@ function App() {
     try {
       const params = new URLSearchParams();
       if (selectedCategory) params.append('categoryId', selectedCategory);
-      if (search) params.append('name', search);
+      if (search.trim()) params.append('name', search.trim());
       
       const pRes = await axios.get(`${API_URL}/api/products?${params.toString()}`, headers);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
