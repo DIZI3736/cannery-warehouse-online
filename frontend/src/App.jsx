@@ -440,8 +440,8 @@ function App() {
                             <td>
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" defaultValue={p.name} onBlur={(e)=>updateProduct({...p, name: e.target.value})} />
-                                ) : <div className="fw-bold text-truncate" style={{maxWidth: '120px'}}>{p.name}</div>}
-                                <div className="d-md-none small text-muted text-truncate" style={{maxWidth: '120px'}}>{p.categoryName}</div>
+                                ) : <div className="fw-bold">{p.name}</div>}
+                                <div className="d-md-none small text-muted">{p.categoryName}</div>
                             </td>
                             <td className="d-none d-md-table-cell">
                                 {user.role === 'STOREKEEPER' ? (
