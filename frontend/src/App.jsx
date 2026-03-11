@@ -136,22 +136,23 @@ function App() {
       setProductError('');
       setEditingErrorId(null);
       
-      let qVal = parseInt(p.quantity);
-      if (p.quantity === "" || p.quantity === null || p.quantity === undefined || isNaN(qVal)) {
-          qVal = 0;
+      if (p.quantity === "" || p.quantity === null || p.quantity === undefined) {
+          setEditingErrorId(p.id);
+          setProductError('Введите количество!');
+          // Оставляем isEditingRef.current = true через стейт, чтобы не было прыжка
+          return; 
       }
 
-      if (qVal < 0) {
+      let qVal = parseInt(p.quantity);
+      if (isNaN(qVal) || qVal < 0) {
           setEditingErrorId(p.id);
-          setProductError('Минус нельзя!');
-          setIsEditing(false); // Снимаем блок даже при ошибке
+          setProductError(qVal < 0 ? 'Минус нельзя!' : 'Введите число!');
           fetchData(); 
           return;
       }
       
-      // Сначала обновляем стейт, потом снимаем блок редактирования
       setProducts(prev => prev.map(item => item.id === p.id ? { ...item, quantity: qVal } : item));
-      setTimeout(() => setIsEditing(false), 100); // Небольшая пауза, чтобы стейт "закрепился"
+      setTimeout(() => setIsEditing(false), 200);
 
       const catId = p.category?.id || p.categoryId;
       const productToSend = { ...p, quantity: qVal, category: { id: catId ? parseInt(catId) : null } };
@@ -160,6 +161,7 @@ function App() {
       } catch (err) { 
           setEditingErrorId(p.id);
           setProductError('Ошибка'); 
+          setIsEditing(false);
           fetchData();
       }
   };
@@ -168,27 +170,29 @@ function App() {
       setProductError('');
       setEditingErrorId(null);
       
-      let pVal = parseFloat(price);
-      if (price === "" || price === null || price === undefined || isNaN(pVal)) {
-          pVal = 0;
-      }
-
-      if (pVal < 0) {
+      if (price === "" || price === null || price === undefined) {
           setEditingErrorId(id);
-          setProductError('Минус нельзя!');
-          setIsEditing(false);
-          return fetchData();
+          setProductError('Введите цену!');
+          return;
       }
 
-      // Сначала стейт, потом снимаем блок
+      let pVal = parseFloat(price);
+      if (isNaN(pVal) || pVal < 0) {
+          setEditingErrorId(id);
+          setProductError(pVal < 0 ? 'Минус нельзя!' : 'Введите число!');
+          fetchData();
+          return;
+      }
+
       setProducts(prev => prev.map(item => item.id === id ? { ...item, price: pVal } : item));
-      setTimeout(() => setIsEditing(false), 100);
+      setTimeout(() => setIsEditing(false), 200);
 
       try {
           await axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader());
       } catch (err) { 
           setEditingErrorId(id);
           setProductError('Ошибка');
+          setIsEditing(false);
           fetchData();
       }
   };
