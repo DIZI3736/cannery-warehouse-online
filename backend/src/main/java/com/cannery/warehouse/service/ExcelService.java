@@ -81,7 +81,7 @@ public class ExcelService {
 
                 String name = currentRow.getCell(1).getStringCellValue();
                 // Ищем существующий товар по имени
-                Product product = repository.findByNameContainingOrderByIdAsc(name).stream()
+                Product product = repository.findByNameContainingIgnoreCaseOrderByIdAsc(name).stream()
                         .filter(p -> p.getName().equalsIgnoreCase(name))
                         .findFirst()
                         .orElse(new Product());

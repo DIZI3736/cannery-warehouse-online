@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// Product service with case-insensitive search logic
 @Service
 public class ProductService {
     private final ProductRepository productRepository;
