@@ -144,8 +144,10 @@ function App() {
       setProductError('');
       setEditingErrorId(null);
       
-      // Если поле пустое, просто сбрасываем редактирование (подтягиваем старое значение из базы)
+      // Если поле совсем пустое (стерли всё), показываем ошибку
       if (price === "" || price === null || price === undefined) {
+          setEditingErrorId(id);
+          setProductError('Введите цену!');
           return fetchData();
       }
 
