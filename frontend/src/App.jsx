@@ -485,12 +485,11 @@ function App() {
                             <td>
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" 
-                                        value={p.name} 
-                                        onFocus={() => setIsEditing(true)}
-                                        onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, name: e.target.value} : item))}
-                                        onBlur={(e) => { setIsEditing(false); updateProduct({...p, name: e.target.value}); }} />
-                                ) : <div className="fw-bold">{p.name}</div>}
-                                <div className="d-md-none small text-muted">{p.categoryName}</div>
+                                    value={p.name} 
+                                    onFocus={() => setIsEditing(true)}
+                                    onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, name: e.target.value} : item))}
+                                    onBlur={(e) => { updateProduct({...p, name: e.target.value}); }} />
+                                    ) : <div className="fw-bold">{p.name}</div>}                                <div className="d-md-none small text-muted">{p.categoryName}</div>
                             </td>
                             <td className="d-none d-md-table-cell">
                                 {user.role === 'STOREKEEPER' ? (
@@ -507,7 +506,7 @@ function App() {
                                             value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
                                             onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
                                             onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, quantity: e.target.value} : item))}
-                                            onBlur={(e) => { setIsEditing(false); updateProduct({...p, quantity: parseInt(e.target.value)}); }} />
+                                            onBlur={(e) => { updateProduct({...p, quantity: e.target.value}); }} />
                                         {editingErrorId === p.id && <div className="text-danger small fw-bold" style={{fontSize: '0.65rem'}}>⚠️</div>}
                                     </>
                                 ) : (
@@ -524,7 +523,7 @@ function App() {
                                                 value={p.price !== null && p.price !== undefined ? p.price : ''} 
                                                 onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
                                                 onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, price: e.target.value} : item))}
-                                                onBlur={(e) => { setIsEditing(false); updatePrice(p.id, e.target.value); }} />
+                                                onBlur={(e) => { updatePrice(p.id, e.target.value); }} />
                                             <span className="ms-1 fw-bold">₽</span>
                                         </div>
                                     ) : <span className="fw-bold">{p.price !== null && p.price !== undefined ? p.price : 0} ₽</span>}
