@@ -122,14 +122,20 @@ function App() {
   const updateProduct = async (p) => {
       setProductError('');
       setEditingErrorId(null);
-      if (p.quantity < 0) {
+      
+      let qVal = parseInt(p.quantity);
+      if (p.quantity === "" || p.quantity === null || p.quantity === undefined || isNaN(qVal)) {
+          qVal = 0;
+      }
+
+      if (qVal < 0) {
           setEditingErrorId(p.id);
           setProductError('Минус нельзя!');
           fetchData(); // Refresh to revert UI value
           return;
       }
       const catId = p.category?.id || p.categoryId;
-      const productToSend = { ...p, category: { id: catId ? parseInt(catId) : null } };
+      const productToSend = { ...p, quantity: qVal, category: { id: catId ? parseInt(catId) : null } };
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
           fetchData();
@@ -144,15 +150,12 @@ function App() {
       setProductError('');
       setEditingErrorId(null);
       
-      // Если поле совсем пустое (стерли всё), показываем ошибку
-      if (price === "" || price === null || price === undefined) {
-          setEditingErrorId(id);
-          setProductError('Введите цену!');
-          return fetchData();
+      let pVal = parseFloat(price);
+      if (price === "" || price === null || price === undefined || isNaN(pVal)) {
+          pVal = 0;
       }
 
-      const pVal = parseFloat(price);
-      if (isNaN(pVal) || pVal < 0) {
+      if (pVal < 0) {
           setEditingErrorId(id);
           setProductError('Минус нельзя!');
           return fetchData();
