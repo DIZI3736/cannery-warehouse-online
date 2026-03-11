@@ -275,7 +275,7 @@ function App() {
         <div className="container">
           <span className="navbar-brand fw-bold fs-5 fs-md-4">🏭 FishERP 2.0</span>
           <div className="d-flex align-items-center gap-2 gap-md-3 ms-auto">
-             <span className="badge bg-primary p-2 px-2 px-md-4 rounded-3 d-none d-sm-inline-block">{roleRu(user.role)}: {user.fullName}</span>
+             <span className="badge bg-primary p-2 px-2 px-md-4 rounded-3" style={{fontSize: '0.7rem'}}>{roleRu(user.role)}: {user.fullName}</span>
              <button className="btn btn-danger btn-sm btn-md px-3 px-md-4 rounded-3 fw-bold" onClick={logout}>ВЫХОД</button>
           </div>
         </div>
@@ -411,23 +411,23 @@ function App() {
             <table className="table modern-table align-middle">
                 <thead>
                     <tr>
-                        <th style={{width: '60px'}} className="d-none d-md-table-cell">Фото</th>
+                        <th style={{width: '50px'}}>Фото</th>
                         <th>Наименование</th>
                         <th style={{width: '140px'}} className="d-none d-md-table-cell">Категория</th>
-                        <th style={{width: '100px'}}>Остаток</th>
-                        {user.role !== 'STOREKEEPER' && <th style={{width: '120px'}}>Цена</th>}
+                        <th style={{width: '80px'}}>Остаток</th>
+                        {user.role !== 'STOREKEEPER' && <th style={{width: '100px'}}>Цена</th>}
                         <th className="text-end pe-4" style={{width: '100px'}}>Опц.</th>
                     </tr>
                 </thead>
                 <tbody>
                     {products.map(p => (
                         <tr key={p.id}>
-                            <td className="d-none d-md-table-cell"><div className="product-img-container"><img src={p.photoUrl} className="product-img" onError={e=>e.target.src='https://cdn-icons-png.flaticon.com/512/1170/1170628.png'}/></div></td>
+                            <td><div className="product-img-container" style={{width: '40px', height: '40px'}}><img src={p.photoUrl} className="product-img" style={{width: '40px', height: '40px'}} onError={e=>e.target.src='https://cdn-icons-png.flaticon.com/512/1170/1170628.png'}/></div></td>
                             <td>
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" defaultValue={p.name} onBlur={(e)=>updateProduct({...p, name: e.target.value})} />
-                                ) : <div className="fw-bold text-truncate" style={{maxWidth: '150px'}}>{p.name}</div>}
-                                <div className="d-md-none small text-muted text-truncate" style={{maxWidth: '150px'}}>{p.categoryName}</div>
+                                ) : <div className="fw-bold text-truncate" style={{maxWidth: '120px'}}>{p.name}</div>}
+                                <div className="d-md-none small text-muted text-truncate" style={{maxWidth: '120px'}}>{p.categoryName}</div>
                             </td>
                             <td className="d-none d-md-table-cell">
                                 {user.role === 'STOREKEEPER' ? (
