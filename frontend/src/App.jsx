@@ -469,10 +469,10 @@ function App() {
                             {user.role !== 'STOREKEEPER' && (
                                 <td>
                                     {user.role === 'ACCOUNTANT' ? (
-                                        <div className="input-group input-group-sm">
-                                            <input type="number" min="0" className={`form-control border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
+                                        <div className="d-flex align-items-center">
+                                            <input type="number" min="0" className={`form-control form-control-sm border-primary bg-white fw-bold text-primary ${editingErrorId === p.id ? 'is-invalid' : ''}`} style={{maxWidth: '80px'}} defaultValue={p.price} onFocus={() => {setEditingErrorId(null); setProductError('');}}
                                                 onBlur={(e)=>updatePrice(p.id, e.target.value)} />
-                                            <span className="input-group-text bg-light text-secondary border-primary fw-bold">₽</span>
+                                            <span className="ms-1 fw-bold text-primary">₽</span>
                                         </div>
                                     ) : <span className="fw-bold">{p.price} ₽</span>}
                                 </td>
