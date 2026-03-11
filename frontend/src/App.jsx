@@ -147,11 +147,15 @@ function App() {
           fetchData(); 
           return;
       }
+      
+      // Сразу обновляем локальное состояние, чтобы не было "прыжков"
+      setProducts(prev => prev.map(item => item.id === p.id ? { ...item, quantity: qVal } : item));
+
       const catId = p.category?.id || p.categoryId;
       const productToSend = { ...p, quantity: qVal, category: { id: catId ? parseInt(catId) : null } };
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
-          fetchData();
+          // Не вызываем fetchData() сразу, чтобы база успела обновиться
       } catch (err) { 
           setEditingErrorId(p.id);
           setProductError('Ошибка'); 
@@ -173,9 +177,13 @@ function App() {
           setProductError('Минус нельзя!');
           return fetchData();
       }
+
+      // Сразу обновляем локальное состояние
+      setProducts(prev => prev.map(item => item.id === id ? { ...item, price: pVal } : item));
+
       try {
           await axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader());
-          fetchData();
+          // Не вызываем fetchData() сразу
       } catch (err) { 
           setEditingErrorId(id);
           setProductError('Ошибка');
