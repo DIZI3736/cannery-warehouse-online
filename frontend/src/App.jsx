@@ -71,7 +71,7 @@ function App() {
         fetchData(); // Initial fetch
         const interval = setInterval(() => {
             fetchData();
-        }, 10000); // 10 seconds polling
+        }, 5000); // 5 seconds polling
         return () => clearInterval(interval);
     }
   }, [user]);
