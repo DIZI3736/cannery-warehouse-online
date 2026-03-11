@@ -31,19 +31,32 @@ body {
 .card {
     background-color: var(--bg-card) !important;
     color: var(--text-main) !important;
-    border: 1px solid var(--border-color) !important;
+    border: 1px solid #d1d5db !important; /* Более четкая рамка для карточек */
 }
 
 .form-control, .form-select {
     background-color: var(--bg-input) !important;
-    border-color: var(--border-color) !important;
+    border: 1px solid #ced4da !important; /* Четкая рамка для полей ввода */
     color: var(--text-main) !important;
+    border-radius: 8px;
 }
 
 .form-control:focus, .form-select:focus {
     background-color: var(--bg-input) !important;
     color: var(--text-main) !important;
-    filter: brightness(1.05);
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    filter: brightness(1.02);
+}
+
+.input-group {
+    border: 1px solid #ced4da !important;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.input-group .form-control {
+    border: none !important;
 }
 
 /* Таблицы */

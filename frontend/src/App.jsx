@@ -143,6 +143,12 @@ function App() {
   const updatePrice = async (id, price) => {
       setProductError('');
       setEditingErrorId(null);
+      
+      // Если поле пустое, просто сбрасываем редактирование (подтягиваем старое значение из базы)
+      if (price === "" || price === null || price === undefined) {
+          return fetchData();
+      }
+
       const pVal = parseFloat(price);
       if (isNaN(pVal) || pVal < 0) {
           setEditingErrorId(id);
