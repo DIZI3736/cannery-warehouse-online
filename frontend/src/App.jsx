@@ -343,6 +343,17 @@ function App() {
             )}
         </div>
 
+        {/* ГЛОБАЛЬНЫЕ УВЕДОМЛЕНИЯ/ОШИБКИ */}
+        {productError && (
+            <div className="fixed-bottom px-3 pb-4 d-flex justify-content-center" style={{zIndex: 2000}}>
+                <div className="alert alert-danger shadow-lg rounded-pill border-0 px-4 py-2 animate-in d-flex align-items-center gap-2 mb-0" style={{maxWidth: '90%'}}>
+                    <span className="fs-5">⚠️</span> 
+                    <div className="fw-bold">{productError}</div>
+                    <button className="btn-close ms-2" style={{fontSize: '0.7rem'}} onClick={() => {setProductError(''); setEditingErrorId(null);}}></button>
+                </div>
+            </div>
+        )}
+
         {/* ОСНОВНОЙ ФУНКЦИОНАЛ */}
         {user.role === 'STOREKEEPER' && (
             <div className="card p-3 p-md-4 shadow-sm border-0 rounded-4 mb-3 mb-md-4 bg-white">
