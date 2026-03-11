@@ -473,7 +473,7 @@ function App() {
                                 {user.role === 'STOREKEEPER' ? (
                                     <>
                                         <input type="number" min="0" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
-                                            value={p.quantity} 
+                                            value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
                                             onFocus={() => {setEditingErrorId(null); setProductError('');}}
                                             onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, quantity: e.target.value} : item))}
                                             onBlur={(e)=>updateProduct({...p, quantity: parseInt(e.target.value)})} />
@@ -490,13 +490,13 @@ function App() {
                                     {user.role === 'ACCOUNTANT' ? (
                                         <div className="d-flex align-items-center">
                                             <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
-                                                value={p.price || ''} 
+                                                value={p.price !== null && p.price !== undefined ? p.price : ''} 
                                                 onFocus={() => {setEditingErrorId(null); setProductError('');}}
                                                 onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, price: e.target.value} : item))}
                                                 onBlur={(e)=>updatePrice(p.id, e.target.value)} />
                                             <span className="ms-1 fw-bold">₽</span>
                                         </div>
-                                    ) : <span className="fw-bold">{p.price} ₽</span>}
+                                    ) : <span className="fw-bold">{p.price !== null && p.price !== undefined ? p.price : 0} ₽</span>}
                                 </td>
                             )}
                             <td className="text-end pe-2 pe-md-4">
