@@ -28,9 +28,9 @@ public class ProductService {
         boolean hasCategory = (categoryId != null && categoryId > 0);
 
         if (hasName && hasCategory) {
-            return productRepository.findByNameContainingAndCategoryIdOrderByIdAsc(name, categoryId);
+            return productRepository.findByNameContainingIgnoreCaseAndCategoryIdOrderByIdAsc(name, categoryId);
         } else if (hasName) {
-            return productRepository.findByNameContainingOrderByIdAsc(name);
+            return productRepository.findByNameContainingIgnoreCaseOrderByIdAsc(name);
         } else if (hasCategory) {
             return productRepository.findByCategoryIdOrderByIdAsc(categoryId);
         } else {
@@ -42,7 +42,10 @@ public class ProductService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String role = auth.getAuthorities().iterator().next().getAuthority();
 
-        if (product.getQuantity() != null && product.getQuantity() < 0) {
+        if (product.getQuantity() == null) {
+            throw new IllegalArgumentException("Quantity is required");
+        }
+        if (product.getQuantity() < 0) {
             throw new IllegalArgumentException("Quantity cannot be negative");
         }
 

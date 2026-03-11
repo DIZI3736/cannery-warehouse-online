@@ -122,7 +122,8 @@ function App() {
     setProductError('');
     if (!newProduct.name.trim()) return setProductError('Введите название товара!');
     if (!newProduct.categoryId) return setProductError('Выберите категорию!');
-    if (newProduct.quantity === '' || parseInt(newProduct.quantity) < 0) return setProductError('Количество не может быть отрицательным!');
+    if (newProduct.quantity === '') return setProductError('Введите количество!');
+    if (parseInt(newProduct.quantity) < 0) return setProductError('Количество не может быть отрицательным!');
 
     try {
       await axios.post(API_URL + '/api/products', { ...newProduct, quantity: parseInt(newProduct.quantity), category: { id: parseInt(newProduct.categoryId) } }, authHeader());
