@@ -66,6 +66,16 @@ function App() {
 
   const logout = () => { localStorage.removeItem('token'); setUser(null); setLoginError(''); setUsername(''); setPassword('1234'); };
 
+  useEffect(() => {
+    if (user) {
+        fetchData(); // Initial fetch
+        const interval = setInterval(() => {
+            fetchData();
+        }, 10000); // 10 seconds polling
+        return () => clearInterval(interval);
+    }
+  }, [user]);
+
   const fetchData = async (currentToken) => {
     const token = currentToken || localStorage.getItem('token');
     if (!token) return;
@@ -77,27 +87,24 @@ function App() {
       
       const pRes = await axios.get(`${API_URL}/api/products?${params.toString()}`, headers);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
-      setProducts(sortedProducts);
+      
+      // Динамическое обновление: меняем состояние только если данные реально изменились
+      setProducts(prev => {
+          if (JSON.stringify(prev) !== JSON.stringify(sortedProducts)) {
+              return sortedProducts;
+          }
+          return prev;
+      });
+
       const cRes = await axios.get(API_URL + '/api/categories', headers);
-      setCategories(cRes.data || []);
+      setCategories(prev => {
+          if (JSON.stringify(prev) !== JSON.stringify(cRes.data)) {
+              return cRes.data;
+          }
+          return prev;
+      });
     } catch (err) { console.error(err); }
   };
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        axios.get(API_URL + '/api/auth/me', { headers: { Authorization: token } })
-            .then(res => { setUser(res.data); })
-            .catch(() => logout());
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-        const timer = setTimeout(() => fetchData(), 300);
-        return () => clearTimeout(timer);
-    }
-  }, [selectedCategory, search, user]);
 
   const addProduct = async () => {
     setProductError('');
