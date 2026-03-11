@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -16,6 +16,10 @@ function App() {
   const [productError, setProductError] = useState('');
   const [editingErrorId, setEditingErrorId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Реф нужен, чтобы setInterval всегда видел актуальное состояние редактирования
+  const isEditingRef = useRef(false);
+  useEffect(() => { isEditingRef.current = isEditing; }, [isEditing]);
 
   const roleRu = (role) => {
     const roles = { 'STOREKEEPER': 'Кладовщик', 'SALES_MANAGER': 'Менеджер сбыта', 'ACCOUNTANT': 'Бухгалтер' };
@@ -50,7 +54,6 @@ function App() {
       console.log("Login successful:", res.data);
       localStorage.setItem('token', token);
       setUser(res.data);
-      fetchData(token);
     } catch (err) { 
         console.error("Login error details:", err);
         if (err.response && err.response.status === 401) {
@@ -67,17 +70,7 @@ function App() {
 
   const logout = () => { localStorage.removeItem('token'); setUser(null); setLoginError(''); setUsername(''); setPassword('1234'); };
 
-  useEffect(() => {
-    if (user) {
-        fetchData(); // Initial fetch
-        const interval = setInterval(() => {
-            fetchData();
-        }, 5000); // 5 seconds polling
-        return () => clearInterval(interval);
-    }
-  }, [user]);
-
-  const fetchData = async (currentToken) => {
+  const fetchData = useCallback(async (currentToken) => {
     const token = currentToken || localStorage.getItem('token');
     if (!token) return;
     const headers = { headers: { Authorization: token } };
@@ -89,10 +82,9 @@ function App() {
       const pRes = await axios.get(`${API_URL}/api/products?${params.toString()}`, headers);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
       
-      // Динамическое обновление: меняем состояние только если данные реально изменились 
-      // И если пользователь в данный момент ничего не редактирует
       setProducts(prev => {
-          if (isEditing) return prev; 
+          // Если пользователь редактирует, НЕ обновляем список извне, чтобы не затереть ввод
+          if (isEditingRef.current) return prev; 
           if (JSON.stringify(prev) !== JSON.stringify(sortedProducts)) {
               return sortedProducts;
           }
@@ -107,7 +99,24 @@ function App() {
           return prev;
       });
     } catch (err) { console.error(err); }
-  };
+  }, [selectedCategory, search]); // Зависимости важны для актуальных данных в поиске
+
+  // Первоначальная загрузка и обновление при поиске/фильтрации
+  useEffect(() => {
+    if (user) {
+        fetchData();
+    }
+  }, [user, fetchData]);
+
+  // Интервал автоматического обновления (10 секунд)
+  useEffect(() => {
+    if (user) {
+        const interval = setInterval(() => {
+            fetchData();
+        }, 10000); 
+        return () => clearInterval(interval);
+    }
+  }, [user, fetchData]);
 
   const addProduct = async () => {
     setProductError('');
@@ -134,7 +143,7 @@ function App() {
       if (qVal < 0) {
           setEditingErrorId(p.id);
           setProductError('Минус нельзя!');
-          fetchData(); // Refresh to revert UI value
+          fetchData(); 
           return;
       }
       const catId = p.category?.id || p.categoryId;
