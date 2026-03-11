@@ -71,18 +71,27 @@ body {
 
 /* Современная таблица настройки */
 .modern-table {
-    border-collapse: separate;
-    border-spacing: 0 8px;
+    border-collapse: separate !important;
+    border-spacing: 0 8px !important;
     background: transparent !important;
     border: none !important;
 }
 
-.modern-table td, .modern-table th, .modern-table tr {
-    border: none !important;
+.modern-table, 
+.modern-table th, 
+.modern-table td, 
+.modern-table tr, 
+.modern-table thead, 
+.modern-table tbody, 
+.modern-table tfoot {
+    border: 0 !important;
+    border-top: 0 !important;
+    border-bottom: 0 !important;
+    outline: none !important;
 }
 
 .modern-table :not(caption) > * > * {
-    border-bottom-width: 0 !important;
+    border: 0 !important;
     box-shadow: none !important;
 }
 
