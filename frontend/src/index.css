@@ -181,3 +181,55 @@ body {
 }
 
 .animate-in { animation: fadeIn 0.6s ease-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .login-card {
+        padding: 25px;
+    }
+    
+    .modern-table thead th {
+        padding: 10px 10px;
+        font-size: 0.65rem;
+    }
+    
+    .modern-table tbody td {
+        padding: 8px 5px;
+        font-size: 0.85rem;
+    }
+    
+    .badge-custom {
+        padding: 4px 8px;
+        font-size: 0.65rem;
+    }
+    
+    .small-btn {
+        font-size: 0.75rem;
+        padding: 5px 10px;
+    }
+
+    .form-control-sm {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .navbar-brand {
+        font-size: 1.1rem !important;
+    }
+    
+    .login-page {
+        padding: 10px;
+    }
+    
+    .login-card {
+        padding: 20px 15px;
+    }
+}
+
+.btn-xs {
+    padding: 1px 5px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    border-radius: 3px;
+}
