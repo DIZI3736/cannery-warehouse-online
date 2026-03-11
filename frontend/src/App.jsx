@@ -259,9 +259,9 @@ function App() {
           </form>
           <div className="mt-5 pt-4 border-top">
              <div className="row g-2">
-                <div className="col-12"><button className="btn btn-outline-success w-100 fw-bold" onClick={() => {setUsername('storekeeper'); setLoginError('');}}>ЗАПОЛНИТЬ: КЛАДОВЩИК</button></div>
-                <div className="col-12"><button className="btn btn-outline-primary w-100 fw-bold" onClick={() => {setUsername('manager'); setLoginError('');}}>ЗАПОЛНИТЬ: МЕНЕДЖЕР</button></div>
-                <div className="col-12"><button className="btn btn-outline-info w-100 fw-bold" onClick={() => {setUsername('accountant'); setLoginError('');}}>ЗАПОЛНИТЬ: БУХГАЛТЕР</button></div>
+                <div className="col-12"><button className="btn btn-outline-success w-100 fw-bold" onClick={() => {setUsername('storekeeper'); setLoginError('');}}>КЛАДОВЩИК</button></div>
+                <div className="col-12"><button className="btn btn-outline-primary w-100 fw-bold" onClick={() => {setUsername('manager'); setLoginError('');}}>МЕНЕДЖЕР</button></div>
+                <div className="col-12"><button className="btn btn-outline-info w-100 fw-bold" onClick={() => {setUsername('accountant'); setLoginError('');}}>БУХГАЛТЕР</button></div>
              </div>
           </div>
         </div>
