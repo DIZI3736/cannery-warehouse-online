@@ -96,7 +96,7 @@ public class ExcelService {
                 }
                 
                 if (quantity != null && quantity < 0) {
-                    throw new RuntimeException("Quantity cannot be negative for product: " + name);
+                    quantity = Math.abs(quantity);
                 }
 
                 // Валидация цены
@@ -116,7 +116,7 @@ public class ExcelService {
                 }
 
                 if (price != null && price.compareTo(BigDecimal.ZERO) < 0) {
-                    throw new RuntimeException("Price cannot be negative for product: " + name);
+                    price = price.abs();
                 }
 
                 // Ищем существующий товар по точному имени (без учета регистра)
