@@ -133,12 +133,19 @@ function App() {
   };
 
   const updateProduct = async (p) => {
+      // Если поле совсем пустое, просто выходим, не восстанавливая старое значение
+      // Это позволит юзеру оставить поле пустым и потом ввести число
+      if (p.quantity === "" || p.quantity === null || p.quantity === undefined) {
+          setEditingErrorId(p.id);
+          setProductError('Введите количество!');
+          return; 
+      }
+
       setProductError('');
       setEditingErrorId(null);
-      setIsEditing(true); // Блокируем фоновое обновление
+      setIsEditing(true); 
 
-      // Если поле пустое, автоматически ставим 0
-      let qVal = (p.quantity === "" || p.quantity === null || p.quantity === undefined) ? 0 : parseInt(p.quantity);
+      let qVal = parseInt(p.quantity);
       
       if (isNaN(qVal) || qVal < 0) {
           setEditingErrorId(p.id);
@@ -149,7 +156,6 @@ function App() {
       }
       
       const catId = p.category?.id || p.categoryId;
-      // Оптимистично обновляем стейт значением 0
       setProducts(prev => prev.map(item => item.id === p.id ? { ...p, quantity: qVal, categoryId: catId } : item));
 
       const productToSend = { 
@@ -170,13 +176,17 @@ function App() {
   };
 
   const updatePrice = async (id, price) => {
+      if (price === "" || price === null || price === undefined) {
+          setEditingErrorId(id);
+          setProductError('Введите цену!');
+          return;
+      }
+
       setProductError('');
       setEditingErrorId(null);
       setIsEditing(true);
 
-      // Если поле пустое, автоматически ставим 0
-      let pVal = (price === "" || price === null || price === undefined) ? 0 : parseFloat(price);
-
+      let pVal = parseFloat(price);
       if (isNaN(pVal) || pVal < 0) {
           setEditingErrorId(id);
           setProductError(pVal < 0 ? 'Минус нельзя!' : 'Введите число!');
