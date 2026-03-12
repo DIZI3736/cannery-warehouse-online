@@ -80,13 +80,58 @@ public class ExcelService {
                 String name = getCellValueAsString(currentRow.getCell(1)).trim();
                 if (name.isEmpty()) continue;
 
+                // Валидация количества
+                Integer quantity = null;
+                Cell qtyCell = currentRow.getCell(3);
+                if (qtyCell != null) {
+                    if (qtyCell.getCellType() == CellType.NUMERIC) {
+                        quantity = (int) qtyCell.getNumericCellValue();
+                    } else if (qtyCell.getCellType() != CellType.BLANK) {
+                        try {
+                            quantity = Integer.parseInt(getCellValueAsString(qtyCell).trim());
+                        } catch (NumberFormatException e) {
+                            throw new RuntimeException("Invalid quantity for product: " + name);
+                        }
+                    }
+                }
+                
+                if (quantity != null && quantity < 0) {
+                    throw new RuntimeException("Quantity cannot be negative for product: " + name);
+                }
+
+                // Валидация цены
+                BigDecimal price = null;
+                Cell priceCell = currentRow.getCell(4);
+                if (priceCell != null) {
+                    if (priceCell.getCellType() == CellType.NUMERIC) {
+                        price = BigDecimal.valueOf(priceCell.getNumericCellValue());
+                    } else if (priceCell.getCellType() != CellType.BLANK) {
+                        try {
+                            String priceStr = getCellValueAsString(priceCell).trim().replace(",", ".");
+                            price = new BigDecimal(priceStr);
+                        } catch (Exception e) {
+                            throw new RuntimeException("Invalid price for product: " + name);
+                        }
+                    }
+                }
+
+                if (price != null && price.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new RuntimeException("Price cannot be negative for product: " + name);
+                }
+
                 // Ищем существующий товар по точному имени (без учета регистра)
                 Product product = repository.findByNameIgnoreCase(name)
                         .orElse(new Product());
                 
                 if (product.getId() == null) {
                     product.setName(name);
+                    // Для нового товара количество обязательно
+                    if (quantity == null) throw new RuntimeException("Quantity is required for new product: " + name);
+                    if (price == null) price = BigDecimal.ZERO;
                 }
+                
+                if (quantity != null) product.setQuantity(quantity);
+                if (price != null) product.setPrice(price);
                 
                 String catName = getCellValueAsString(currentRow.getCell(2)).trim();
                 if (!catName.isEmpty()) {
@@ -96,49 +141,14 @@ public class ExcelService {
                         return categoryRepo.save(newCat);
                     }));
                 } else {
-                    // Если категория пустая в Excel, мы её не зануляем, если она уже есть у товара,
-                    // либо ставим null для нового товара. 
-                    // Хотя если пользователь хочет УДАЛИТЬ категорию через эксель, это сложнее.
-                    // Для простоты: если пусто в ячейке, не трогаем категорию существующего товара.
                     if (product.getId() == null) product.setCategory(null);
-                }
-                
-                Cell qtyCell = currentRow.getCell(3);
-                if (qtyCell != null) {
-                    if (qtyCell.getCellType() == CellType.NUMERIC) {
-                        product.setQuantity((int) qtyCell.getNumericCellValue());
-                    } else {
-                        try {
-                            product.setQuantity(Integer.parseInt(getCellValueAsString(qtyCell).trim()));
-                        } catch (NumberFormatException e) {
-                            if (product.getQuantity() == null) product.setQuantity(0);
-                        }
-                    }
-                } else if (product.getQuantity() == null) {
-                    product.setQuantity(0);
-                }
-                
-                Cell priceCell = currentRow.getCell(4);
-                if (priceCell != null) {
-                    if (priceCell.getCellType() == CellType.NUMERIC) {
-                        product.setPrice(BigDecimal.valueOf(priceCell.getNumericCellValue()));
-                    } else {
-                        try {
-                            String priceStr = getCellValueAsString(priceCell).trim().replace(",", ".");
-                            product.setPrice(new BigDecimal(priceStr));
-                        } catch (Exception e) {
-                            if (product.getPrice() == null) product.setPrice(BigDecimal.ZERO);
-                        }
-                    }
-                } else if (product.getPrice() == null) {
-                    product.setPrice(BigDecimal.ZERO);
                 }
 
                 repository.save(product);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Failed to parse Excel file: " + e.getMessage());
+            throw new RuntimeException("Failed to parse Excel file: " + (e.getMessage() != null ? e.getMessage() : "Check file structure"));
         }
     }
 
