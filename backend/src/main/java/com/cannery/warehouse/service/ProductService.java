@@ -58,10 +58,19 @@ public class ProductService {
             existing.setQuantity(product.getQuantity());
             existing.setPhotoUrl(product.getPhotoUrl());
             
-            // Carefully update category
-            if (product.getCategory() != null && product.getCategory().getId() != null) {
-                Category category = categoryRepository.findById(product.getCategory().getId()).orElse(null);
-                if (category != null) existing.setCategory(category);
+            // Update category
+            if (product.getCategory() != null) {
+                if (product.getCategory().getId() != null) {
+                    Category category = categoryRepository.findById(product.getCategory().getId()).orElse(null);
+                    existing.setCategory(category);
+                } else {
+                    // Если объект категории есть, но ID пустой - значит категорию сняли
+                    existing.setCategory(null);
+                }
+            } else {
+                // Если самого объекта категории нет в запросе - не трогаем её (или тоже можно занулить, 
+                // но обычно патч-запросы не присылают всё поле, если не хотят менять)
+                // В нашем случае фронт присылает объект, так что логика выше сработает.
             }
             
             // Only update price if NOT a storekeeper
@@ -75,6 +84,8 @@ public class ProductService {
             if (product.getCategory() != null && product.getCategory().getId() != null) {
                 Category category = categoryRepository.findById(product.getCategory().getId()).orElse(null);
                 product.setCategory(category);
+            } else {
+                product.setCategory(null);
             }
             if ("STOREKEEPER".equals(role) && product.getPrice() == null) {
                 product.setPrice(BigDecimal.ZERO);

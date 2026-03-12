@@ -135,32 +135,42 @@ function App() {
   const updateProduct = async (p) => {
       setProductError('');
       setEditingErrorId(null);
-      
-      if (p.quantity === "" || p.quantity === null || p.quantity === undefined) {
-          setEditingErrorId(p.id);
-          setProductError('Введите количество!');
-          // Оставляем isEditingRef.current = true через стейт, чтобы не было прыжка
-          return; 
-      }
+      setIsEditing(true); // Сразу блокируем фоновое обновление
 
-      let qVal = parseInt(p.quantity);
+      // Если ввели пустую строку, считаем что это 0, чтобы не было ошибок parseInt
+      let qVal = (p.quantity === "" || p.quantity === null) ? 0 : parseInt(p.quantity);
+      
       if (isNaN(qVal) || qVal < 0) {
           setEditingErrorId(p.id);
           setProductError(qVal < 0 ? 'Минус нельзя!' : 'Введите число!');
+          setIsEditing(false);
           fetchData(); 
           return;
       }
       
-      setProducts(prev => prev.map(item => item.id === p.id ? { ...item, quantity: qVal } : item));
-      setTimeout(() => setIsEditing(false), 200);
-
+      // Находим актуальный ID категории
       const catId = p.category?.id || p.categoryId;
-      const productToSend = { ...p, quantity: qVal, category: { id: catId ? parseInt(catId) : null } };
+
+      // Оптимистично обновляем стейт, чтобы юзер сразу видел изменения
+      setProducts(prev => prev.map(item => item.id === p.id ? { ...p, quantity: qVal, categoryId: catId } : item));
+
+      // Формируем объект для сервера. Если категория не выбрана, шлем null
+      const productToSend = { 
+          ...p, 
+          quantity: qVal, 
+          category: (catId && catId !== "") ? { id: parseInt(catId) } : null 
+      };
+
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
+          // Даем серверу 1 секунду "на раздумья" перед тем как снова разрешить фоновое обновление
+          setTimeout(() => {
+              setIsEditing(false);
+          }, 1000);
       } catch (err) { 
+          console.error("Update failed:", err);
           setEditingErrorId(p.id);
-          setProductError('Ошибка'); 
+          setProductError('Ошибка сохранения'); 
           setIsEditing(false);
           fetchData();
       }
@@ -169,29 +179,25 @@ function App() {
   const updatePrice = async (id, price) => {
       setProductError('');
       setEditingErrorId(null);
+      setIsEditing(true);
       
-      if (price === "" || price === null || price === undefined) {
-          setEditingErrorId(id);
-          setProductError('Введите цену!');
-          return;
-      }
-
-      let pVal = parseFloat(price);
+      let pVal = (price === "" || price === null) ? 0 : parseFloat(price);
       if (isNaN(pVal) || pVal < 0) {
           setEditingErrorId(id);
           setProductError(pVal < 0 ? 'Минус нельзя!' : 'Введите число!');
+          setIsEditing(false);
           fetchData();
           return;
       }
 
       setProducts(prev => prev.map(item => item.id === id ? { ...item, price: pVal } : item));
-      setTimeout(() => setIsEditing(false), 200);
 
       try {
           await axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader());
+          setTimeout(() => setIsEditing(false), 1000);
       } catch (err) { 
           setEditingErrorId(id);
-          setProductError('Ошибка');
+          setProductError('Ошибка сохранения цены');
           setIsEditing(false);
           fetchData();
       }
@@ -489,7 +495,24 @@ function App() {
                                     onFocus={() => setIsEditing(true)}
                                     onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, name: e.target.value} : item))}
                                     onBlur={(e) => { updateProduct({...p, name: e.target.value}); }} />
-                                    ) : <div className="fw-bold">{p.name}</div>}                                <div className="d-md-none small text-muted">{p.categoryName}</div>
+                                    ) : <div className="fw-bold">{p.name}</div>}
+                                
+                                {/* Мобильная версия категории (вид на телефонах) */}
+                                <div className="d-md-none mt-1">
+                                    {user.role === 'STOREKEEPER' ? (
+                                        <select 
+                                            className="form-select form-select-sm border-0 p-0 text-muted bg-transparent" 
+                                            style={{fontSize: '0.75rem', width: 'auto'}}
+                                            value={p.categoryId || ''} 
+                                            onChange={(e) => updateProduct({...p, category: {id: e.target.value}})}
+                                        >
+                                            <option value="" disabled>Категория...</option>
+                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    ) : (
+                                        <div className="small text-muted">{p.categoryName}</div>
+                                    )}
+                                </div>
                             </td>
                             <td className="d-none d-md-table-cell">
                                 {user.role === 'STOREKEEPER' ? (

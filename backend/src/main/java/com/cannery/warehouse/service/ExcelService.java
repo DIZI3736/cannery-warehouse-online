@@ -77,38 +77,59 @@ public class ExcelService {
 
             while (rows.hasNext()) {
                 Row currentRow = rows.next();
-                if (currentRow.getCell(1) == null || currentRow.getCell(1).getCellType() == CellType.BLANK) continue;
+                String name = getCellValueAsString(currentRow.getCell(1)).trim();
+                if (name.isEmpty()) continue;
 
-                String name = currentRow.getCell(1).getStringCellValue();
-                // Ищем существующий товар по имени
-                Product product = repository.findByNameContainingIgnoreCaseOrderByIdAsc(name).stream()
-                        .filter(p -> p.getName().equalsIgnoreCase(name))
-                        .findFirst()
+                // Ищем существующий товар по точному имени (без учета регистра)
+                Product product = repository.findByNameIgnoreCase(name)
                         .orElse(new Product());
                 
                 if (product.getId() == null) {
                     product.setName(name);
                 }
                 
-                if (currentRow.getCell(2) != null && !currentRow.getCell(2).getStringCellValue().trim().isEmpty()) {
-                    String catName = currentRow.getCell(2).getStringCellValue().trim();
-                    product.setCategory(categoryRepo.findByName(catName).orElseGet(() -> {
+                String catName = getCellValueAsString(currentRow.getCell(2)).trim();
+                if (!catName.isEmpty()) {
+                    product.setCategory(categoryRepo.findByNameIgnoreCase(catName).orElseGet(() -> {
                         com.cannery.warehouse.model.Category newCat = new com.cannery.warehouse.model.Category();
                         newCat.setName(catName);
                         return categoryRepo.save(newCat);
                     }));
                 } else {
-                    product.setCategory(null);
+                    // Если категория пустая в Excel, мы её не зануляем, если она уже есть у товара,
+                    // либо ставим null для нового товара. 
+                    // Хотя если пользователь хочет УДАЛИТЬ категорию через эксель, это сложнее.
+                    // Для простоты: если пусто в ячейке, не трогаем категорию существующего товара.
+                    if (product.getId() == null) product.setCategory(null);
                 }
                 
-                if (currentRow.getCell(3) != null && currentRow.getCell(3).getCellType() == CellType.NUMERIC) {
-                    product.setQuantity((int) currentRow.getCell(3).getNumericCellValue());
+                Cell qtyCell = currentRow.getCell(3);
+                if (qtyCell != null) {
+                    if (qtyCell.getCellType() == CellType.NUMERIC) {
+                        product.setQuantity((int) qtyCell.getNumericCellValue());
+                    } else {
+                        try {
+                            product.setQuantity(Integer.parseInt(getCellValueAsString(qtyCell).trim()));
+                        } catch (NumberFormatException e) {
+                            if (product.getQuantity() == null) product.setQuantity(0);
+                        }
+                    }
                 } else if (product.getQuantity() == null) {
                     product.setQuantity(0);
                 }
                 
-                if (currentRow.getLastCellNum() > 4 && currentRow.getCell(4) != null && currentRow.getCell(4).getCellType() == CellType.NUMERIC) {
-                    product.setPrice(BigDecimal.valueOf(currentRow.getCell(4).getNumericCellValue()));
+                Cell priceCell = currentRow.getCell(4);
+                if (priceCell != null) {
+                    if (priceCell.getCellType() == CellType.NUMERIC) {
+                        product.setPrice(BigDecimal.valueOf(priceCell.getNumericCellValue()));
+                    } else {
+                        try {
+                            String priceStr = getCellValueAsString(priceCell).trim().replace(",", ".");
+                            product.setPrice(new BigDecimal(priceStr));
+                        } catch (Exception e) {
+                            if (product.getPrice() == null) product.setPrice(BigDecimal.ZERO);
+                        }
+                    }
                 } else if (product.getPrice() == null) {
                     product.setPrice(BigDecimal.ZERO);
                 }
@@ -116,7 +137,21 @@ public class ExcelService {
                 repository.save(product);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException("Failed to parse Excel file: " + e.getMessage());
+        }
+    }
+
+    private String getCellValueAsString(Cell cell) {
+        if (cell == null) return "";
+        switch (cell.getCellType()) {
+            case STRING: return cell.getStringCellValue();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) return cell.getDateCellValue().toString();
+                return String.valueOf((long)cell.getNumericCellValue());
+            case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA: return cell.getCellFormula();
+            default: return "";
         }
     }
 }
