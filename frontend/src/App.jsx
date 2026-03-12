@@ -135,10 +135,17 @@ function App() {
   const updateProduct = async (p) => {
       setProductError('');
       setEditingErrorId(null);
-      setIsEditing(true); // Сразу блокируем фоновое обновление
+      
+      // Если поле пустое, не сохраняем и выводим ошибку
+      if (p.quantity === "" || p.quantity === null || p.quantity === undefined) {
+          setEditingErrorId(p.id);
+          setProductError('Введите количество!');
+          setIsEditing(false);
+          return; 
+      }
 
-      // Если ввели пустую строку, считаем что это 0, чтобы не было ошибок parseInt
-      let qVal = (p.quantity === "" || p.quantity === null) ? 0 : parseInt(p.quantity);
+      setIsEditing(true); 
+      let qVal = parseInt(p.quantity);
       
       if (isNaN(qVal) || qVal < 0) {
           setEditingErrorId(p.id);
@@ -148,13 +155,9 @@ function App() {
           return;
       }
       
-      // Находим актуальный ID категории
       const catId = p.category?.id || p.categoryId;
-
-      // Оптимистично обновляем стейт, чтобы юзер сразу видел изменения
       setProducts(prev => prev.map(item => item.id === p.id ? { ...p, quantity: qVal, categoryId: catId } : item));
 
-      // Формируем объект для сервера. Если категория не выбрана, шлем null
       const productToSend = { 
           ...p, 
           quantity: qVal, 
@@ -163,12 +166,8 @@ function App() {
 
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
-          // Даем серверу 1 секунду "на раздумья" перед тем как снова разрешить фоновое обновление
-          setTimeout(() => {
-              setIsEditing(false);
-          }, 1000);
+          setTimeout(() => setIsEditing(false), 1000);
       } catch (err) { 
-          console.error("Update failed:", err);
           setEditingErrorId(p.id);
           setProductError('Ошибка сохранения'); 
           setIsEditing(false);
@@ -179,9 +178,16 @@ function App() {
   const updatePrice = async (id, price) => {
       setProductError('');
       setEditingErrorId(null);
+
+      if (price === "" || price === null || price === undefined) {
+          setEditingErrorId(id);
+          setProductError('Введите цену!');
+          setIsEditing(false);
+          return;
+      }
+
       setIsEditing(true);
-      
-      let pVal = (price === "" || price === null) ? 0 : parseFloat(price);
+      let pVal = parseFloat(price);
       if (isNaN(pVal) || pVal < 0) {
           setEditingErrorId(id);
           setProductError(pVal < 0 ? 'Минус нельзя!' : 'Введите число!');
