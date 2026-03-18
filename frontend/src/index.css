@@ -277,6 +277,7 @@ body {
 .topbar-shell {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16px;
 }
 
@@ -319,6 +320,7 @@ body {
 
 .toolbar-filter {
     flex: 1 1 260px;
+    width: 100%;
 }
 
 .toolbar-buttons {
@@ -398,27 +400,172 @@ body {
     gap: 10px;
 }
 
+.mobile-product-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.mobile-product-card {
+    padding: 18px;
+    border-radius: 24px;
+}
+
+.mobile-product-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.mobile-product-image {
+    width: 68px;
+    height: 68px;
+    flex: 0 0 68px;
+}
+
+.mobile-product-image .product-img {
+    width: 68px;
+    height: 68px;
+}
+
+.mobile-product-main {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.mobile-product-name,
+.mobile-product-name-input {
+    margin: 0;
+    padding: 0;
+    font-size: 1.1rem;
+    line-height: 1.3;
+    color: #0f172a;
+}
+
+.mobile-product-name-input {
+    box-shadow: none !important;
+}
+
+.mobile-product-id {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.mobile-quantity-badge {
+    white-space: nowrap;
+    align-self: flex-start;
+}
+
+.mobile-product-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.mobile-product-field {
+    padding: 14px;
+    border-radius: 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.mobile-product-field-wide {
+    grid-column: 1 / -1;
+}
+
+.mobile-product-label {
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+}
+
+.mobile-product-value,
+.mobile-product-qty {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.mobile-input {
+    min-height: 46px;
+    border: 1px solid #dbe4f0 !important;
+    background: #ffffff !important;
+    border-radius: 14px;
+    font-weight: 600;
+}
+
+.mobile-price-editor {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mobile-price-editor .mobile-input {
+    flex: 1 1 auto;
+}
+
+.mobile-currency {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.mobile-inline-error {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #dc3545;
+}
+
+.mobile-product-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.mobile-action-btn {
+    min-height: 44px;
+    border-radius: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 @media (max-width: 768px) {
     .topbar-shell {
-        align-items: flex-start;
-        gap: 10px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
     }
 
     .topbar-user {
         width: 100%;
         margin-left: 0;
-        justify-content: stretch;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
     }
 
     .topbar-badge,
     .topbar-logout {
-        width: 100%;
+        width: auto;
         text-align: center;
     }
 
     .toolbar-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .toolbar-filter {
+        flex: 1 1 auto;
     }
 
     .toolbar-buttons {
@@ -536,5 +683,49 @@ body {
 
     .app-modal-backdrop {
         padding: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .mobile-product-card {
+        padding: 16px;
+        border-radius: 22px;
+    }
+
+    .mobile-product-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-product-field-wide {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .topbar-user {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar-badge,
+    .topbar-logout {
+        width: 100%;
+    }
+
+    .topbar-badge {
+        font-size: 0.72rem;
+        padding: 10px 14px;
+    }
+
+    .mobile-product-header {
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .mobile-quantity-badge {
+        width: 100%;
+    }
+
+    .mobile-product-actions {
+        grid-template-columns: 1fr;
     }
 }

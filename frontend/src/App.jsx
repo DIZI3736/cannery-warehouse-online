@@ -365,6 +365,142 @@ function App() {
       const total = products.reduce((sum, p) => sum + p.quantity, 0);
       return Object.entries(stats).map(([name, qty]) => ({ name, percent: Math.round((qty/total)*100) }));
   };
+  const getProductCategoryId = (product) => product.category?.id || product.categoryId || '';
+  const setLocalProductState = (id, patch) => {
+      setProducts(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
+  };
+  const openPhotoLinkPrompt = (product = null) => {
+      const url = prompt("Введите ссылку на фото:");
+      if (!url) return;
+
+      if (product) {
+          updateProduct({ ...product, photoUrl: url });
+          return;
+      }
+
+      setNewProduct(prev => ({ ...prev, photoUrl: url }));
+      setProductError('');
+  };
+
+  const renderStorekeeperActions = (product, mobile = false) => (
+      <div className={mobile ? "mobile-product-actions" : "d-flex gap-1 justify-content-end align-items-center"}>
+          <button
+              className={mobile ? "btn btn-light mobile-action-btn" : "btn btn-xs btn-light rounded-circle"}
+              onClick={() => openPhotoLinkPrompt(product)}
+              title="Добавить по ссылке"
+              style={mobile ? undefined : {padding: '2px 5px', fontSize: '10px'}}
+          >
+              {mobile ? 'Ссылка' : '🔗'}
+          </button>
+          <label
+              className={mobile ? "btn btn-light mobile-action-btn mb-0" : "btn btn-xs btn-light rounded-circle mb-0"}
+              title="Загрузить фото"
+              style={mobile ? undefined : {padding: '2px 5px', fontSize: '10px'}}
+          >
+              {mobile ? 'Фото' : '📁'}
+              <input type="file" hidden accept="image/*" onChange={(e) => uploadPhoto(e, product)} />
+          </label>
+          <button
+              className={mobile ? "btn btn-outline-danger mobile-action-btn" : "btn btn-xs btn-outline-danger rounded-circle"}
+              title="Удалить"
+              style={mobile ? undefined : {padding: '2px 5px', fontSize: '10px'}}
+              onClick={() => requestDeleteProduct(product)}
+          >
+              {mobile ? 'Удалить' : '🗑️'}
+          </button>
+      </div>
+  );
+
+  const renderMobileProductCard = (product) => (
+      <div key={product.id} className="card mobile-product-card shadow-sm border-0 rounded-4">
+          <div className="mobile-product-header">
+              <div className="product-img-container mobile-product-image">
+                  <img src={product.photoUrl || FALLBACK_IMAGE} className="product-img" onError={e => e.target.src = FALLBACK_IMAGE} />
+              </div>
+              <div className="mobile-product-main">
+                  {user.role === 'STOREKEEPER' ? (
+                      <input
+                          className="form-control border-0 bg-transparent fw-bold mobile-product-name-input"
+                          value={product.name}
+                          onFocus={() => setIsEditing(true)}
+                          onChange={(e) => setLocalProductState(product.id, { name: e.target.value })}
+                          onBlur={(e) => updateProduct({ ...product, name: e.target.value })}
+                      />
+                  ) : (
+                      <h6 className="mobile-product-name">{product.name}</h6>
+                  )}
+                  <div className="mobile-product-id">Товар #{product.id}</div>
+              </div>
+              {user.role !== 'STOREKEEPER' && (
+                  <div className={`badge-custom mobile-quantity-badge ${product.quantity < 200 ? 'bg-critical' : 'bg-ok'}`}>
+                      {product.quantity} шт.
+                  </div>
+              )}
+          </div>
+
+          <div className="mobile-product-grid">
+              <div className="mobile-product-field">
+                  <div className="mobile-product-label">Категория</div>
+                  {user.role === 'STOREKEEPER' ? (
+                      <select
+                          className="form-select mobile-input"
+                          value={getProductCategoryId(product)}
+                          onChange={(e) => updateProduct({ ...product, category: { id: e.target.value } })}
+                      >
+                          <option value="" disabled>Выбор...</option>
+                          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                  ) : (
+                      <div className="mobile-product-value">{product.categoryName || 'Без категории'}</div>
+                  )}
+              </div>
+
+              <div className="mobile-product-field">
+                  <div className="mobile-product-label">Остаток</div>
+                  {user.role === 'STOREKEEPER' ? (
+                      <>
+                          <input
+                              type="number"
+                              min="0"
+                              className={`form-control mobile-input ${editingErrorId === product.id ? 'is-invalid' : ''}`}
+                              value={product.quantity !== null && product.quantity !== undefined ? product.quantity : ''}
+                              onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
+                              onChange={(e) => setLocalProductState(product.id, { quantity: e.target.value })}
+                              onBlur={(e) => updateProduct({ ...product, quantity: e.target.value })}
+                          />
+                          {editingErrorId === product.id && <div className="mobile-inline-error">Проверьте значение</div>}
+                      </>
+                  ) : (
+                      <div className="mobile-product-value mobile-product-qty">{product.quantity} шт.</div>
+                  )}
+              </div>
+
+              {user.role !== 'STOREKEEPER' && (
+                  <div className="mobile-product-field mobile-product-field-wide">
+                      <div className="mobile-product-label">Цена</div>
+                      {user.role === 'ACCOUNTANT' ? (
+                          <div className="mobile-price-editor">
+                              <input
+                                  type="number"
+                                  min="0"
+                                  className={`form-control mobile-input ${editingErrorId === product.id ? 'is-invalid' : ''}`}
+                                  value={product.price !== null && product.price !== undefined ? product.price : ''}
+                                  onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
+                                  onChange={(e) => setLocalProductState(product.id, { price: e.target.value })}
+                                  onBlur={(e) => updatePrice(product.id, e.target.value)}
+                              />
+                              <span className="mobile-currency">₽</span>
+                          </div>
+                      ) : (
+                          <div className="mobile-product-value fw-bold">{product.price !== null && product.price !== undefined ? product.price : 0} ₽</div>
+                      )}
+                  </div>
+              )}
+          </div>
+
+          {user.role === 'STOREKEEPER' && renderStorekeeperActions(product, true)}
+      </div>
+  );
 
   if (!user) {
     return (
@@ -517,7 +653,7 @@ function App() {
                             )}
                             <div className="input-group bg-light rounded-3 overflow-hidden">
                                 <input className="form-control border-0 bg-transparent" placeholder="Ссылка или файл..." value={newProduct.photoUrl} onChange={e=>{setNewProduct({...newProduct, photoUrl: e.target.value}); setProductError('');}} />
-                                <button className="btn btn-light border-0 d-flex align-items-center px-2" onClick={() => { const url = prompt("Введите ссылку на фото:"); if(url) { setNewProduct({...newProduct, photoUrl: url}); setProductError(''); } }} title="Добавить по ссылке">
+                                <button className="btn btn-light border-0 d-flex align-items-center px-2" onClick={() => openPhotoLinkPrompt()} title="Добавить по ссылке">
                                     🔗
                                 </button>
                                 <label className="btn btn-light border-0 d-flex align-items-center px-2" title="Загрузить файл с диска">
@@ -559,7 +695,11 @@ function App() {
             </div>
         </div>
 
-        <div className="table-responsive animate-in mobile-table-wrap">
+        <div className="d-md-none mobile-product-list animate-in">
+            {products.map(renderMobileProductCard)}
+        </div>
+
+        <div className="table-responsive animate-in mobile-table-wrap d-none d-md-block">
             <table className="table modern-table align-middle">
                 <thead>
                     <tr>
@@ -580,7 +720,7 @@ function App() {
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" 
                                     value={p.name} 
                                     onFocus={() => setIsEditing(true)}
-                                    onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, name: e.target.value} : item))}
+                                    onChange={(e) => setLocalProductState(p.id, { name: e.target.value })}
                                     onBlur={(e) => { updateProduct({...p, name: e.target.value}); }} />
                                     ) : <div className="fw-bold">{p.name}</div>}
                                 
@@ -603,7 +743,7 @@ function App() {
                             </td>
                             <td className="d-none d-md-table-cell" data-label="Категория">
                                 {user.role === 'STOREKEEPER' ? (
-                                    <select className="form-select form-select-sm border-0 bg-light" value={p.categoryId || ''} onChange={(e)=>updateProduct({...p, category: {id: e.target.value}})}>
+                                    <select className="form-select form-select-sm border-0 bg-light" value={getProductCategoryId(p)} onChange={(e)=>updateProduct({...p, category: {id: e.target.value}})}>
                                         <option value="" disabled>Выбор...</option>
                                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
@@ -615,7 +755,7 @@ function App() {
                                         <input type="number" min="0" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
                                             value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
                                             onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
-                                            onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, quantity: e.target.value} : item))}
+                                            onChange={(e) => setLocalProductState(p.id, { quantity: e.target.value })}
                                             onBlur={(e) => { updateProduct({...p, quantity: e.target.value}); }} />
                                         {editingErrorId === p.id && <div className="text-danger small fw-bold" style={{fontSize: '0.65rem'}}>⚠️</div>}
                                     </>
@@ -632,7 +772,7 @@ function App() {
                                             <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
                                                 value={p.price !== null && p.price !== undefined ? p.price : ''} 
                                                 onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
-                                                onChange={(e) => setProducts(products.map(item => item.id === p.id ? {...item, price: e.target.value} : item))}
+                                                onChange={(e) => setLocalProductState(p.id, { price: e.target.value })}
                                                 onBlur={(e) => { updatePrice(p.id, e.target.value); }} />
                                             <span className="ms-1 fw-bold">₽</span>
                                         </div>
@@ -641,15 +781,7 @@ function App() {
                             )}
                             <td className="text-end pe-2 pe-md-4" data-label="Опции">
                                 {user.role === 'STOREKEEPER' ? (
-                                    <div className="d-flex gap-1 justify-content-end align-items-center">
-                                        <button className="btn btn-xs btn-light rounded-circle" onClick={() => { const url = prompt("Введите ссылку на фото:"); if(url) updateProduct({...p, photoUrl: url}); }} title="Добавить по ссылке" style={{padding: '2px 5px', fontSize: '10px'}}>
-                                            🔗
-                                        </button>
-                                        <label className="btn btn-xs btn-light rounded-circle mb-0" title="Загрузить фото" style={{padding: '2px 5px', fontSize: '10px'}}>
-                                            📁<input type="file" hidden accept="image/*" onChange={(e) => uploadPhoto(e, p)} />
-                                        </label>
-                                        <button className="btn btn-xs btn-outline-danger rounded-circle" title="Удалить" style={{padding: '2px 5px', fontSize: '10px'}} onClick={() => requestDeleteProduct(p)}>🗑️</button>
-                                    </div>
+                                    renderStorekeeperActions(p)
                                 ) : <span className="text-muted small">🔒</span>}
                             </td>
                         </tr>
