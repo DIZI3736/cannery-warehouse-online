@@ -1,7 +1,37 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+const FALLBACK_IMAGE = 'https://cdn-icons-png.flaticon.com/512/1170/1170628.png';
+
+function DeleteDialog({ product, loading, onCancel, onConfirm }) {
+  if (!product) return null;
+
+  return (
+    <div className="app-modal-backdrop" onClick={loading ? undefined : onCancel}>
+      <div className="app-modal animate-in" onClick={(event) => event.stopPropagation()}>
+        <div className="app-modal-header">
+          <div>
+            <div className="app-modal-kicker">Подтверждение</div>
+            <h5 className="app-modal-title">Удалить товар?</h5>
+          </div>
+          <button type="button" className="btn-close" onClick={onCancel} disabled={loading} />
+        </div>
+        <p className="app-modal-text">
+          Вы действительно хотите удалить <strong>{product.name}</strong>?
+        </p>
+        <div className="app-modal-actions">
+          <button type="button" className="btn btn-light" onClick={onCancel} disabled={loading}>
+            Отмена
+          </button>
+          <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={loading}>
+            {loading ? 'Удаление...' : 'Удалить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -16,10 +46,24 @@ function App() {
   const [productError, setProductError] = useState('');
   const [editingErrorId, setEditingErrorId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   
   // Реф нужен, чтобы setInterval всегда видел актуальное состояние редактирования
   const isEditingRef = useRef(false);
   useEffect(() => { isEditingRef.current = isEditing; }, [isEditing]);
+  useEffect(() => {
+    if (!deleteCandidate) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape' && !deleteLoading) {
+        setDeleteCandidate(null);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteCandidate, deleteLoading]);
 
   const roleRu = (role) => {
     const roles = { 'STOREKEEPER': 'Кладовщик', 'SALES_MANAGER': 'Менеджер сбыта', 'ACCOUNTANT': 'Бухгалтер' };
@@ -208,12 +252,28 @@ function App() {
       }
   };
 
-  const deleteProduct = async (id) => {
-      if (!window.confirm('Вы уверены, что хотите удалить этот товар?')) return;
+  const requestDeleteProduct = (product) => {
+      setDeleteCandidate(product);
+  };
+
+  const closeDeleteModal = () => {
+      if (deleteLoading) return;
+      setDeleteCandidate(null);
+  };
+
+  const deleteProduct = async () => {
+      if (!deleteCandidate) return;
+
+      setDeleteLoading(true);
       try {
-          await axios.delete(`${API_URL}/api/products/${id}`, authHeader());
+          await axios.delete(`${API_URL}/api/products/${deleteCandidate.id}`, authHeader());
+          setDeleteCandidate(null);
           fetchData();
-      } catch (err) { setProductError('Ошибка при удалении'); }
+      } catch (err) {
+          setProductError('Ошибка при удалении');
+      } finally {
+          setDeleteLoading(false);
+      }
   };
 
   const exportToExcel = async () => {
@@ -228,7 +288,7 @@ function App() {
         link.setAttribute('download', 'products.xlsx');
         document.body.appendChild(link);
         link.click();
-    } catch (err) { alert('Ошибка при экспорте'); }
+    } catch (err) { setProductError('Ошибка при экспорте'); }
   };
 
   const handleImport = async (e) => {
@@ -290,7 +350,7 @@ function App() {
           } else {
               msg = err.message;
           }
-          alert('Ошибка загрузки фото: ' + msg); 
+          setProductError('Ошибка загрузки фото: ' + msg); 
       }
   };
 
@@ -342,12 +402,18 @@ function App() {
 
   return (
     <div className="app-wrapper min-vh-100">
+      <DeleteDialog
+        product={deleteCandidate}
+        loading={deleteLoading}
+        onCancel={closeDeleteModal}
+        onConfirm={deleteProduct}
+      />
       <nav className="navbar navbar-expand-lg navbar-dark bg-dark shadow sticky-top py-2 py-md-3">
-        <div className="container">
+        <div className="container topbar-shell">
           <span className="navbar-brand fw-bold fs-5 fs-md-4">🏭 FishERP 2.0</span>
-          <div className="d-flex align-items-center gap-2 gap-md-3 ms-auto">
-             <span className="badge bg-primary p-2 px-2 px-md-4 rounded-3" style={{fontSize: '0.7rem'}}>{roleRu(user.role)}: {user.fullName}</span>
-             <button className="btn btn-danger btn-sm btn-md px-3 px-md-4 rounded-3 fw-bold" onClick={logout}>ВЫХОД</button>
+          <div className="topbar-user">
+             <span className="badge bg-primary topbar-badge">{roleRu(user.role)}: {user.fullName}</span>
+             <button className="btn btn-danger topbar-logout rounded-3 fw-bold" onClick={logout}>ВЫХОД</button>
           </div>
         </div>
       </nav>
@@ -416,8 +482,8 @@ function App() {
 
         {/* ГЛОБАЛЬНЫЕ УВЕДОМЛЕНИЯ/ОШИБКИ */}
         {productError && (
-            <div className="fixed-bottom px-3 pb-4 d-flex justify-content-center" style={{zIndex: 2000}}>
-                <div className="alert alert-danger shadow-lg rounded-pill border-0 px-4 py-2 animate-in d-flex align-items-center gap-2 mb-0" style={{maxWidth: '90%'}}>
+            <div className="app-toast-wrap">
+                <div className="alert alert-danger app-toast shadow-lg border-0 px-4 py-2 animate-in d-flex align-items-start gap-2 mb-0">
                     <span className="fs-5">⚠️</span> 
                     <div className="fw-bold">{productError}</div>
                     <button className="btn-close ms-2" style={{fontSize: '0.7rem'}} onClick={() => {setProductError(''); setEditingErrorId(null);}}></button>
@@ -464,18 +530,17 @@ function App() {
                         <button className="btn btn-dark w-100 fw-bold py-2 shadow-sm" onClick={addProduct}>ПРИНЯТЬ</button>
                     </div>
                 </div>
-                {productError && !editingErrorId && <div className="text-danger small fw-bold mt-2 animate-in">⚠️ {productError}</div>}
             </div>
         )}
 
-        <div className="card shadow-sm p-3 p-md-4 mb-3 mb-md-4 border-0 rounded-4 bg-white d-flex flex-column flex-md-row align-items-center gap-2 gap-md-3">
-            <input className="form-control rounded-pill px-4 bg-light border-0" placeholder="🔍 Поиск по реестру..." onChange={e => setSearch(e.target.value)} />
-            <div className="w-100 d-flex gap-2">
-                <select className="form-select rounded-pill bg-light border-0" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+        <div className="card toolbar-card shadow-sm p-3 p-md-4 mb-3 mb-md-4 border-0 rounded-4 bg-white">
+            <input className="form-control rounded-pill px-4 bg-light border-0 toolbar-search" placeholder="🔍 Поиск по реестру..." onChange={e => setSearch(e.target.value)} />
+            <div className="toolbar-actions">
+                <select className="form-select rounded-pill bg-light border-0 toolbar-filter" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
                     <option value="">Все категории</option>
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <div className="d-flex gap-1 gap-md-2">
+                <div className="toolbar-buttons">
                     <button className="btn btn-outline-success rounded-pill px-2 px-md-3 fw-bold small-btn" onClick={exportToExcel} title="Экспорт в Excel">
                         📥 <span className="d-none d-sm-inline">ЭКСПОРТ</span>
                     </button>
@@ -494,7 +559,7 @@ function App() {
             </div>
         </div>
 
-        <div className="table-responsive animate-in">
+        <div className="table-responsive animate-in mobile-table-wrap">
             <table className="table modern-table align-middle">
                 <thead>
                     <tr>
@@ -509,8 +574,8 @@ function App() {
                 <tbody>
                     {products.map(p => (
                         <tr key={p.id}>
-                            <td><div className="product-img-container" style={{width: '40px', height: '40px'}}><img src={p.photoUrl} className="product-img" style={{width: '40px', height: '40px'}} onError={e=>e.target.src='https://cdn-icons-png.flaticon.com/512/1170/1170628.png'}/></div></td>
-                            <td>
+                            <td data-label="Фото"><div className="product-img-container" style={{width: '40px', height: '40px'}}><img src={p.photoUrl || FALLBACK_IMAGE} className="product-img" style={{width: '40px', height: '40px'}} onError={e=>e.target.src=FALLBACK_IMAGE}/></div></td>
+                            <td data-label="Наименование">
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" 
                                     value={p.name} 
@@ -536,7 +601,7 @@ function App() {
                                     )}
                                 </div>
                             </td>
-                            <td className="d-none d-md-table-cell">
+                            <td className="d-none d-md-table-cell" data-label="Категория">
                                 {user.role === 'STOREKEEPER' ? (
                                     <select className="form-select form-select-sm border-0 bg-light" value={p.categoryId || ''} onChange={(e)=>updateProduct({...p, category: {id: e.target.value}})}>
                                         <option value="" disabled>Выбор...</option>
@@ -544,7 +609,7 @@ function App() {
                                     </select>
                                 ) : <span className="badge bg-light text-dark fw-normal">{p.categoryName}</span>}
                             </td>
-                            <td>
+                            <td data-label="Остаток">
                                 {user.role === 'STOREKEEPER' ? (
                                     <>
                                         <input type="number" min="0" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
@@ -561,7 +626,7 @@ function App() {
                                 )}
                             </td>
                             {user.role !== 'STOREKEEPER' && (
-                                <td>
+                                <td data-label="Цена">
                                     {user.role === 'ACCOUNTANT' ? (
                                         <div className="d-flex align-items-center">
                                             <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
@@ -574,7 +639,7 @@ function App() {
                                     ) : <span className="fw-bold">{p.price !== null && p.price !== undefined ? p.price : 0} ₽</span>}
                                 </td>
                             )}
-                            <td className="text-end pe-2 pe-md-4">
+                            <td className="text-end pe-2 pe-md-4" data-label="Опции">
                                 {user.role === 'STOREKEEPER' ? (
                                     <div className="d-flex gap-1 justify-content-end align-items-center">
                                         <button className="btn btn-xs btn-light rounded-circle" onClick={() => { const url = prompt("Введите ссылку на фото:"); if(url) updateProduct({...p, photoUrl: url}); }} title="Добавить по ссылке" style={{padding: '2px 5px', fontSize: '10px'}}>
@@ -583,7 +648,7 @@ function App() {
                                         <label className="btn btn-xs btn-light rounded-circle mb-0" title="Загрузить фото" style={{padding: '2px 5px', fontSize: '10px'}}>
                                             📁<input type="file" hidden accept="image/*" onChange={(e) => uploadPhoto(e, p)} />
                                         </label>
-                                        <button className="btn btn-xs btn-outline-danger rounded-circle" title="Удалить" style={{padding: '2px 5px', fontSize: '10px'}} onClick={() => deleteProduct(p.id)}>🗑️</button>
+                                        <button className="btn btn-xs btn-outline-danger rounded-circle" title="Удалить" style={{padding: '2px 5px', fontSize: '10px'}} onClick={() => requestDeleteProduct(p)}>🗑️</button>
                                     </div>
                                 ) : <span className="text-muted small">🔒</span>}
                             </td>
