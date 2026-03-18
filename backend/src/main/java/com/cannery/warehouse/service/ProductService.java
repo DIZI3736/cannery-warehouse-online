@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
 
 // Product service with case-insensitive search logic
 @Service
@@ -24,6 +24,14 @@ public class ProductService {
     public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+    }
+
+    private String normalizeProductName(String name) {
+        String trimmedName = name != null ? name.trim() : "";
+        if (trimmedName.isEmpty()) {
+            return trimmedName;
+        }
+        return trimmedName.substring(0, 1).toUpperCase(Locale.forLanguageTag("ru-RU")) + trimmedName.substring(1);
     }
 
     public List<Product> getAllProducts(String name, Long categoryId) {
@@ -44,7 +52,7 @@ public class ProductService {
     public Product saveProduct(Product product) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String role = auth.getAuthorities().iterator().next().getAuthority();
-        String normalizedName = product.getName() != null ? product.getName().trim() : "";
+        String normalizedName = normalizeProductName(product.getName());
 
         if (normalizedName.isEmpty()) {
             throw new IllegalArgumentException(NAME_REQUIRED_MESSAGE);
