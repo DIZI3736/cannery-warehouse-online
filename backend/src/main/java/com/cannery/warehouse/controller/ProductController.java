@@ -1,11 +1,14 @@
 package com.cannery.warehouse.controller;
 
 import com.cannery.warehouse.dto.ProductDTO;
+import com.cannery.warehouse.dto.ProductStatsDTO;
 import com.cannery.warehouse.model.Product;
+import com.cannery.warehouse.model.Role;
 import com.cannery.warehouse.repository.CategoryRepository;
 import com.cannery.warehouse.repository.ProductRepository;
 import com.cannery.warehouse.service.ExcelService;
 import com.cannery.warehouse.service.ProductService;
+import com.cannery.warehouse.service.ProductStatsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -41,6 +44,7 @@ import java.util.stream.Collectors;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductStatsService productStatsService;
     private final ExcelService excelService;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -49,10 +53,12 @@ public class ProductController {
     private String uploadPath;
 
     public ProductController(ProductService productService,
+                             ProductStatsService productStatsService,
                              ExcelService excelService,
                              ProductRepository productRepository,
                              CategoryRepository categoryRepository) {
         this.productService = productService;
+        this.productStatsService = productStatsService;
         this.excelService = excelService;
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
@@ -81,6 +87,17 @@ public class ProductController {
             }
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTANT', 'SALES_MANAGER', 'STOREKEEPER')")
+    public ProductStatsDTO getStats(@RequestParam(required = false) String name,
+                                    @RequestParam(required = false) Long categoryId) {
+        List<Product> products = productService.getAllProducts(name, categoryId);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String authority = auth.getAuthorities().iterator().next().getAuthority();
+        Role role = Role.valueOf(authority);
+        return productStatsService.buildStats(products, role);
     }
 
     @PostMapping

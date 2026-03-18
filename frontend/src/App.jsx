@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 const FALLBACK_IMAGE = 'https://cdn-icons-png.flaticon.com/512/1170/1170628.png';
+const EMPTY_PRODUCT_STATS = { deficitItems: [], totalValue: 0, categoryStats: [] };
 
 function DeleteDialog({ product, loading, onCancel, onConfirm }) {
   if (!product) return null;
@@ -33,6 +34,44 @@ function DeleteDialog({ product, loading, onCancel, onConfirm }) {
   );
 }
 
+function PhotoLinkDialog({ open, value, error, onChange, onCancel, onConfirm }) {
+  if (!open) return null;
+
+  return (
+    <div className="app-modal-backdrop" onClick={onCancel}>
+      <div className="app-modal animate-in" onClick={(event) => event.stopPropagation()}>
+        <div className="app-modal-header">
+          <div>
+            <div className="app-modal-kicker">Фото товара</div>
+            <h5 className="app-modal-title">Ссылка на изображение</h5>
+          </div>
+          <button type="button" className="btn-close" onClick={onCancel} />
+        </div>
+        <p className="app-modal-text">
+          Вставьте прямую ссылку на фото товара. После сохранения изображение появится в списке.
+        </p>
+        <input
+          type="url"
+          className="form-control app-modal-input"
+          placeholder="https://example.com/photo.jpg"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoFocus
+        />
+        {error && <div className="app-modal-error">{error}</div>}
+        <div className="app-modal-actions">
+          <button type="button" className="btn btn-light" onClick={onCancel}>
+            Отмена
+          </button>
+          <button type="button" className="btn btn-primary" onClick={onConfirm}>
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [username, setUsername] = useState('');
@@ -44,10 +83,12 @@ function App() {
   const [newProduct, setNewProduct] = useState({ name: '', quantity: '', categoryId: '', photoUrl: '' });
   const [loginError, setLoginError] = useState('');
   const [productError, setProductError] = useState('');
+  const [productStats, setProductStats] = useState(EMPTY_PRODUCT_STATS);
   const [editingErrorId, setEditingErrorId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [photoDialog, setPhotoDialog] = useState({ open: false, product: null, value: '', error: '' });
   
   // Реф нужен, чтобы setInterval всегда видел актуальное состояние редактирования
   const isEditingRef = useRef(false);
@@ -88,14 +129,11 @@ function App() {
     setLoginLoading(true);
     setLoginError('');
     
-    console.log("Attempting login for:", finalUsername);
-    
     // Proper way to handle UTF-8 in Basic Auth
     const token = 'Basic ' + btoa(encodeURIComponent(finalUsername + ':' + finalPassword).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
     
     try {
       const res = await axios.get(API_URL + '/api/auth/me', { headers: { Authorization: token } });
-      console.log("Login successful:", res.data);
       localStorage.setItem('token', token);
       setUser(res.data);
     } catch (err) { 
@@ -114,16 +152,89 @@ function App() {
 
   const logout = () => { localStorage.removeItem('token'); setUser(null); setLoginError(''); setUsername(''); setPassword('1234'); };
 
+  const buildFilterQueryString = useCallback(() => {
+    const params = new URLSearchParams();
+    if (selectedCategory) params.append('categoryId', selectedCategory);
+    if (search.trim()) params.append('name', search.trim());
+    return params.toString();
+  }, [selectedCategory, search]);
+
+  const normalizeProductStats = (data) => ({
+    deficitItems: data?.deficitItems || [],
+    totalValue: Number(data?.totalValue || 0),
+    categoryStats: data?.categoryStats || []
+  });
+
+  const buildFallbackProductStats = useCallback((items) => {
+    const safeItems = items || [];
+    const deficitItems = safeItems
+      .filter((item) => Number(item?.quantity ?? 0) < 200)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: Number(item?.quantity ?? 0)
+      }));
+
+    const totalValue = safeItems.reduce((sum, item) => {
+      const price = Number(item?.price ?? 0);
+      const quantity = Number(item?.quantity ?? 0);
+      return sum + (price * quantity);
+    }, 0);
+
+    const categoryTotals = {};
+    let totalQuantity = 0;
+    safeItems.forEach((item) => {
+      const categoryName = item?.categoryName ?? 'undefined';
+      const quantity = Number(item?.quantity ?? 0);
+      categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + quantity;
+      totalQuantity += quantity;
+    });
+
+    const categoryStats = Object.entries(categoryTotals).map(([name, quantity]) => ({
+      name,
+      percent: totalQuantity ? Math.round((quantity / totalQuantity) * 100) : 0
+    }));
+
+    return { deficitItems, totalValue, categoryStats };
+  }, []);
+
+  const applyProductStats = useCallback((nextStats, ignoreEditingGuard = false) => {
+    setProductStats(prev => {
+        if (!ignoreEditingGuard && isEditingRef.current) return prev;
+        if (JSON.stringify(prev) !== JSON.stringify(nextStats)) {
+            return nextStats;
+        }
+        return prev;
+    });
+  }, []);
+
+  const fetchProductStats = useCallback(async (currentToken, ignoreEditingGuard = false, fallbackProducts = []) => {
+    const token = currentToken || localStorage.getItem('token');
+    if (!token) return;
+
+    const headers = { headers: { Authorization: token } };
+    const query = buildFilterQueryString();
+    const url = `${API_URL}/api/products/stats${query ? `?${query}` : ''}`;
+
+    try {
+      const statsRes = await axios.get(url, headers);
+      applyProductStats(normalizeProductStats(statsRes.data), ignoreEditingGuard);
+    } catch (err) {
+      applyProductStats(buildFallbackProductStats(fallbackProducts), ignoreEditingGuard);
+    }
+  }, [applyProductStats, buildFallbackProductStats, buildFilterQueryString]);
+
   const fetchData = useCallback(async (currentToken) => {
     const token = currentToken || localStorage.getItem('token');
     if (!token) return;
     const headers = { headers: { Authorization: token } };
     try {
-      const params = new URLSearchParams();
-      if (selectedCategory) params.append('categoryId', selectedCategory);
-      if (search.trim()) params.append('name', search.trim());
-      
-      const pRes = await axios.get(`${API_URL}/api/products?${params.toString()}`, headers);
+      const query = buildFilterQueryString();
+      const suffix = query ? `?${query}` : '';
+      const [pRes, cRes] = await Promise.all([
+          axios.get(`${API_URL}/api/products${suffix}`, headers),
+          axios.get(API_URL + '/api/categories', headers)
+      ]);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
       
       setProducts(prev => {
@@ -135,15 +246,15 @@ function App() {
           return prev;
       });
 
-      const cRes = await axios.get(API_URL + '/api/categories', headers);
       setCategories(prev => {
           if (JSON.stringify(prev) !== JSON.stringify(cRes.data)) {
               return cRes.data;
           }
           return prev;
       });
+      fetchProductStats(token, false, sortedProducts);
     } catch (err) { console.error(err); }
-  }, [selectedCategory, search]); // Зависимости важны для актуальных данных в поиске
+  }, [buildFilterQueryString, fetchProductStats]); // Зависимости важны для актуальных данных в поиске
 
   // Первоначальная загрузка и обновление при поиске/фильтрации
   useEffect(() => {
@@ -231,7 +342,8 @@ function App() {
       }
       
       const catId = p.category?.id || p.categoryId;
-      setProducts(prev => prev.map(item => item.id === p.id ? { ...p, name: trimmedName, quantity: qVal, categoryId: catId } : item));
+      const nextProducts = products.map(item => item.id === p.id ? { ...p, name: trimmedName, quantity: qVal, categoryId: catId } : item);
+      setProducts(nextProducts);
 
       const productToSend = { 
           ...p, 
@@ -242,6 +354,7 @@ function App() {
 
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
+          fetchProductStats(null, true, nextProducts);
           endEditingLater();
       } catch (err) { 
           resetEditingWithError(getApiErrorMessage(err, 'Ошибка сохранения'), p.id);
@@ -264,10 +377,12 @@ function App() {
           return;
       }
 
-      setProducts(prev => prev.map(item => item.id === id ? { ...item, price: pVal } : item));
+      const nextProducts = products.map(item => item.id === id ? { ...item, price: pVal } : item);
+      setProducts(nextProducts);
 
       try {
           await axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader());
+          fetchProductStats(null, true, nextProducts);
           endEditingLater();
       } catch (err) { 
           resetEditingWithError(getApiErrorMessage(err, 'Ошибка сохранения цены'), id);
@@ -348,14 +463,12 @@ function App() {
   const uploadPhoto = async (e, p = null) => {
       const file = e.target.files[0];
       if (!file) return;
-      console.log("Uploading file:", file.name, "size:", file.size);
       const formData = new FormData();
       formData.append('file', file);
       try {
           const res = await axios.post(`${API_URL}/api/products/upload`, formData, {
               headers: { ...authHeader().headers, 'Content-Type': 'multipart/form-data' }
           });
-          console.log("Upload success, path:", res.data);
           const photoUrl = API_URL + res.data;
           if (p) {
               updateProduct({ ...p, photoUrl });
@@ -376,39 +489,43 @@ function App() {
       }
   };
 
-  // --- ИЗЮМИНКИ (ЛОГИКА) ---
-  const getDeficitItems = () => products.filter(p => p.quantity < 200);
-  const getTotalValue = () => products.reduce((sum, p) => sum + (p.price * p.quantity || 0), 0);
-  const getCategoryStats = () => {
-      const stats = {};
-      products.forEach(p => {
-          stats[p.categoryName] = (stats[p.categoryName] || 0) + p.quantity;
-      });
-      const total = products.reduce((sum, p) => sum + p.quantity, 0);
-      return Object.entries(stats).map(([name, qty]) => ({ name, percent: Math.round((qty/total)*100) }));
-  };
   const getProductCategoryId = (product) => product.category?.id || product.categoryId || '';
   const setLocalProductState = (id, patch) => {
       setProducts(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
   };
-  const openPhotoLinkPrompt = (product = null) => {
-      const url = prompt("Введите ссылку на фото:");
-      if (!url) return;
-
-      if (product) {
-          updateProduct({ ...product, photoUrl: url });
+  const openPhotoLinkDialog = (product = null) => {
+      setPhotoDialog({
+          open: true,
+          product,
+          value: product?.photoUrl || newProduct.photoUrl || '',
+          error: ''
+      });
+  };
+  const closePhotoLinkDialog = () => {
+      setPhotoDialog({ open: false, product: null, value: '', error: '' });
+  };
+  const savePhotoLink = () => {
+      const normalizedUrl = photoDialog.value.trim();
+      if (!normalizedUrl) {
+          setPhotoDialog(prev => ({ ...prev, error: 'Введите ссылку на фото' }));
           return;
       }
 
-      setNewProduct(prev => ({ ...prev, photoUrl: url }));
-      setProductError('');
+      if (photoDialog.product) {
+          updateProduct({ ...photoDialog.product, photoUrl: normalizedUrl });
+      } else {
+          setNewProduct(prev => ({ ...prev, photoUrl: normalizedUrl }));
+          setProductError('');
+      }
+
+      closePhotoLinkDialog();
   };
 
   const renderStorekeeperActions = (product, mobile = false) => (
       <div className={mobile ? "mobile-product-actions" : "d-flex gap-1 justify-content-end align-items-center"}>
           <button
               className={mobile ? "btn btn-light mobile-action-btn" : "btn btn-xs btn-light rounded-circle"}
-              onClick={() => openPhotoLinkPrompt(product)}
+              onClick={() => openPhotoLinkDialog(product)}
               title="Добавить по ссылке"
               style={mobile ? undefined : {padding: '2px 5px', fontSize: '10px'}}
           >
@@ -560,6 +677,14 @@ function App() {
 
   return (
     <div className="app-wrapper min-vh-100">
+      <PhotoLinkDialog
+        open={photoDialog.open}
+        value={photoDialog.value}
+        error={photoDialog.error}
+        onChange={(value) => setPhotoDialog(prev => ({ ...prev, value, error: '' }))}
+        onCancel={closePhotoLinkDialog}
+        onConfirm={savePhotoLink}
+      />
       <DeleteDialog
         product={deleteCandidate}
         loading={deleteLoading}
@@ -580,12 +705,12 @@ function App() {
         
         {/* РАЗДЕЛ "ИЗЮМИНКИ" */}
         <div className="row mb-3 mb-md-4">
-            {user.role === 'STOREKEEPER' && getDeficitItems().length > 0 && (
+            {user.role === 'STOREKEEPER' && productStats.deficitItems.length > 0 && (
                 <div className="col-12 animate-in mb-3">
                     <div className="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white border-start border-danger border-5">
                         <h6 className="fw-bold text-danger mb-3">⚡ Срочно к пополнению (Дефицит менее 200 шт)</h6>
                         <div className="d-flex flex-wrap gap-2">
-                            {getDeficitItems().map(p => (
+                            {productStats.deficitItems.map(p => (
                                 <span key={p.id} className="badge bg-danger-subtle text-danger p-2 px-3 rounded-pill" style={{fontSize: '0.8rem'}}>
                                     {p.name}: <strong>{p.quantity} шт.</strong>
                                 </span>
@@ -594,7 +719,7 @@ function App() {
                     </div>
                 </div>
             )}
-            {user.role === 'STOREKEEPER' && getDeficitItems().length === 0 && (
+            {user.role === 'STOREKEEPER' && productStats.deficitItems.length === 0 && (
                 <div className="col-12 animate-in mb-3">
                     <div className="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-success border-5">
                         <div className="d-flex align-items-center text-success fw-bold small">
@@ -612,7 +737,7 @@ function App() {
                                 <p className="opacity-75 mb-2 mb-md-0 small">Суммарная балансовая стоимость ТМЦ на складе завода</p>
                             </div>
                             <div className="col-md-4 text-md-end">
-                                <h3 className="fw-extrabold mb-0">{getTotalValue().toLocaleString()} ₽</h3>
+                                <h3 className="fw-extrabold mb-0">{Number(productStats.totalValue || 0).toLocaleString()} ₽</h3>
                             </div>
                         </div>
                     </div>
@@ -623,7 +748,7 @@ function App() {
                     <div className="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white">
                         <h6 className="fw-bold mb-3">📈 Структура складских запасов</h6>
                         <div className="row">
-                            {getCategoryStats().map(s => (
+                            {productStats.categoryStats.map(s => (
                                 <div key={s.name} className="col-md-4 col-12 mb-3">
                                     <div className="small fw-bold text-muted mb-1">{s.name}</div>
                                     <div className="progress" style={{height: '8px'}}>
@@ -675,7 +800,7 @@ function App() {
                             )}
                             <div className="input-group bg-light rounded-3 overflow-hidden">
                                 <input className="form-control border-0 bg-transparent" placeholder="Ссылка или файл..." value={newProduct.photoUrl} onChange={e=>{setNewProduct({...newProduct, photoUrl: e.target.value}); setProductError('');}} />
-                                <button className="btn btn-light border-0 d-flex align-items-center px-2" onClick={() => openPhotoLinkPrompt()} title="Добавить по ссылке">
+                                <button className="btn btn-light border-0 d-flex align-items-center px-2" onClick={() => openPhotoLinkDialog()} title="Добавить по ссылке">
                                     🔗
                                 </button>
                                 <label className="btn btn-light border-0 d-flex align-items-center px-2" title="Загрузить файл с диска">
