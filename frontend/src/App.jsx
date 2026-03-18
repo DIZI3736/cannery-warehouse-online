@@ -234,6 +234,7 @@ function App() {
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setProductError('');
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -243,9 +244,23 @@ function App() {
                 'Content-Type': 'multipart/form-data'
             }
         });
-        console.log('Данные успешно импортированы');
         fetchData();
-    } catch (err) { console.error('Ошибка при импорте'); }
+        e.target.value = '';
+    } catch (err) { 
+        console.error('Ошибка при импорте:', err);
+        let msg = 'Ошибка при импорте. Проверьте структуру файла.';
+        if (err.response && err.response.data) {
+            if (typeof err.response.data === 'string') {
+                msg = err.response.data;
+            } else if (err.response.data.message) {
+                msg = err.response.data.message;
+            } else {
+                msg = JSON.stringify(err.response.data);
+            }
+        }
+        setProductError(msg);
+        e.target.value = '';
+    }
   };
 
   const uploadPhoto = async (e, p = null) => {
@@ -464,15 +479,17 @@ function App() {
                     <button className="btn btn-outline-success rounded-pill px-2 px-md-3 fw-bold small-btn" onClick={exportToExcel} title="Экспорт в Excel">
                         📥 <span className="d-none d-sm-inline">ЭКСПОРТ</span>
                     </button>
-                    <label className="btn btn-outline-primary rounded-pill px-2 px-md-3 fw-bold mb-0 small-btn" style={{ cursor: 'pointer' }} title="Импорт из Excel">
-                        📤 <span className="d-none d-sm-inline">ИМПОРТ</span>
-                        <input 
-                            type="file" 
-                            style={{ display: 'none' }} 
-                            accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
-                            onChange={handleImport} 
-                        />
-                    </label>
+                    {user?.role !== 'SALES_MANAGER' && (
+                        <label className="btn btn-outline-primary rounded-pill px-2 px-md-3 fw-bold mb-0 small-btn" style={{ cursor: 'pointer' }} title="Импорт из Excel">
+                            📤 <span className="d-none d-sm-inline">ИМПОРТ</span>
+                            <input 
+                                type="file" 
+                                style={{ display: 'none' }} 
+                                accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                                onChange={handleImport} 
+                            />
+                        </label>
+                    )}
                 </div>
             </div>
         </div>

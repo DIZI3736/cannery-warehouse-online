@@ -10,13 +10,22 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -34,10 +43,14 @@ public class ProductController {
     private final ExcelService excelService;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+
     @Value("${upload.path:uploads}")
     private String uploadPath;
 
-    public ProductController(ProductService productService, ExcelService excelService, ProductRepository productRepository, CategoryRepository categoryRepository) {
+    public ProductController(ProductService productService,
+                             ExcelService excelService,
+                             ProductRepository productRepository,
+                             CategoryRepository categoryRepository) {
         this.productService = productService;
         this.excelService = excelService;
         this.productRepository = productRepository;
@@ -45,10 +58,8 @@ public class ProductController {
     }
 
     @GetMapping
-    public List<ProductDTO> getAll(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) Long categoryId) {
-        
+    public List<ProductDTO> getAll(@RequestParam(required = false) String name,
+                                   @RequestParam(required = false) Long categoryId) {
         List<Product> products = productService.getAllProducts(name, categoryId);
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String role = auth.getAuthorities().iterator().next().getAuthority();
@@ -100,7 +111,9 @@ public class ProductController {
     @PreAuthorize("hasAnyAuthority('ACCOUNTANT', 'SALES_MANAGER', 'STOREKEEPER')")
     public ResponseEntity<Resource> getFile() {
         String filename = "products.xlsx";
-        InputStreamResource file = new InputStreamResource(excelService.productsToExcel(productService.getAllProducts(null, null)));
+        InputStreamResource file = new InputStreamResource(
+                excelService.productsToExcel(productService.getAllProducts(null, null))
+        );
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
@@ -110,9 +123,25 @@ public class ProductController {
 
     @PostMapping("/import")
     @PreAuthorize("hasAnyAuthority('STOREKEEPER', 'ACCOUNTANT')")
-    public ResponseEntity<String> importExcel(@RequestParam("file") MultipartFile file) {
-        excelService.save(file, productRepository, categoryRepository);
-        return ResponseEntity.ok("Import successful");
+    public ResponseEntity<?> importExcel(@RequestParam("file") MultipartFile file) {
+        System.out.println(">>> IMPORT STARTED for file: " + file.getOriginalFilename());
+        try {
+            excelService.save(file, productRepository, categoryRepository);
+            System.out.println(">>> IMPORT SUCCESS");
+            return ResponseEntity.ok("Import successful");
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "Некорректные данные в Excel";
+            System.out.println(">>> IMPORT FAILED: " + errorMsg);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Ошибка при импорте: " + errorMsg);
+        } catch (Throwable t) {
+            t.printStackTrace();
+            String errorMsg = t.getMessage() != null ? t.getMessage() : t.toString();
+            System.out.println(">>> IMPORT FAILED: " + errorMsg);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Ошибка при импорте: " + errorMsg);
+        }
     }
 
     @PostMapping("/upload")
@@ -140,9 +169,8 @@ public class ProductController {
                 return ResponseEntity.ok()
                         .contentType(MediaType.IMAGE_JPEG)
                         .body(resource);
-            } else {
-                return ResponseEntity.notFound().build();
             }
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }

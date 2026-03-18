@@ -3,7 +3,12 @@ package com.cannery.warehouse.service;
 import com.cannery.warehouse.model.Product;
 import com.cannery.warehouse.repository.CategoryRepository;
 import com.cannery.warehouse.repository.ProductRepository;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,7 +19,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Iterator;
 import java.util.List;
 
 @Service
@@ -35,9 +39,10 @@ public class ExcelService {
             Sheet sheet = workbook.createSheet("Products");
 
             Row headerRow = sheet.createRow(0);
-            String[] columns = hidePrice ? new String[]{"ID", "Name", "Category", "Quantity"} 
-                                         : new String[]{"ID", "Name", "Category", "Quantity", "Price"};
-            
+            String[] columns = hidePrice
+                    ? new String[]{"ID", "Name", "Category", "Quantity"}
+                    : new String[]{"ID", "Name", "Category", "Quantity", "Price"};
+
             for (int i = 0; i < columns.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(columns[i]);
@@ -50,7 +55,7 @@ public class ExcelService {
                 row.createCell(1).setCellValue(product.getName());
                 row.createCell(2).setCellValue(product.getCategory() != null ? product.getCategory().getName() : "");
                 row.createCell(3).setCellValue(product.getQuantity() != null ? product.getQuantity() : 0);
-                
+
                 if (!hidePrice) {
                     Cell priceCell = row.createCell(4);
                     if (product.getPrice() != null) {
@@ -71,16 +76,27 @@ public class ExcelService {
     public void save(MultipartFile file, ProductRepository repository, CategoryRepository categoryRepo) {
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rows = sheet.iterator();
-            
-            if (rows.hasNext()) rows.next(); // Skip header
-
-            while (rows.hasNext()) {
-                Row currentRow = rows.next();
+            for (int rowIndex = 0; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row currentRow = sheet.getRow(rowIndex);
+                if (currentRow == null) {
+                    continue;
+                }
                 String name = getCellValueAsString(currentRow.getCell(1)).trim();
-                if (name.isEmpty()) continue;
 
-                // Валидация количества
+                if (isRowEmpty(currentRow)) {
+                    continue;
+                }
+
+                if (rowIndex == 0 && isHeaderRow(currentRow)) {
+                    continue;
+                }
+
+                if (name.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "Строка " + (currentRow.getRowNum() + 1) + ": поле 'Название' обязательно для заполнения."
+                    );
+                }
+
                 Integer quantity = null;
                 Cell qtyCell = currentRow.getCell(3);
                 if (qtyCell != null) {
@@ -94,12 +110,11 @@ public class ExcelService {
                         }
                     }
                 }
-                
+
                 if (quantity != null && quantity < 0) {
-                    quantity = Math.abs(quantity);
+                    throw new RuntimeException("Quantity cannot be negative for product: " + name);
                 }
 
-                // Валидация цены
                 BigDecimal price = null;
                 Cell priceCell = currentRow.getCell(4);
                 if (priceCell != null) {
@@ -116,23 +131,32 @@ public class ExcelService {
                 }
 
                 if (price != null && price.compareTo(BigDecimal.ZERO) < 0) {
-                    price = price.abs();
+                    throw new RuntimeException("Price cannot be negative for product: " + name);
                 }
 
-                // Ищем существующий товар по точному имени (без учета регистра)
-                Product product = repository.findByNameIgnoreCase(name)
-                        .orElse(new Product());
-                
+                Product product = repository.findByNameIgnoreCase(name).orElse(new Product());
+
                 if (product.getId() == null) {
                     product.setName(name);
-                    // Для нового товара количество обязательно
-                    if (quantity == null) throw new RuntimeException("Quantity is required for new product: " + name);
-                    if (price == null) price = BigDecimal.ZERO;
+                    if (quantity == null) {
+                        quantity = 0;
+                    }
+                    if (price == null) {
+                        price = BigDecimal.ZERO;
+                    }
                 }
-                
-                if (quantity != null) product.setQuantity(quantity);
-                if (price != null) product.setPrice(price);
-                
+
+                if (quantity != null) {
+                    product.setQuantity(quantity);
+                } else if (product.getQuantity() == null) {
+                    product.setQuantity(0);
+                }
+                if (price != null) {
+                    product.setPrice(price);
+                } else if (product.getPrice() == null) {
+                    product.setPrice(BigDecimal.ZERO);
+                }
+
                 String catName = getCellValueAsString(currentRow.getCell(2)).trim();
                 if (!catName.isEmpty()) {
                     product.setCategory(categoryRepo.findByNameIgnoreCase(catName).orElseGet(() -> {
@@ -140,28 +164,60 @@ public class ExcelService {
                         newCat.setName(catName);
                         return categoryRepo.save(newCat);
                     }));
-                } else {
-                    if (product.getId() == null) product.setCategory(null);
+                } else if (product.getId() == null) {
+                    product.setCategory(null);
                 }
 
                 repository.save(product);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Failed to parse Excel file: " + (e.getMessage() != null ? e.getMessage() : "Check file structure"));
+            if (e instanceof IllegalArgumentException) {
+                throw (IllegalArgumentException) e;
+            }
+            throw new RuntimeException(
+                    "Ошибка чтения файла Excel: "
+                            + (e.getMessage() != null ? e.getMessage() : "Проверьте формат файла (.xlsx или .xls)")
+            );
         }
     }
 
+    private boolean isRowEmpty(Row row) {
+        for (int i = 0; i <= 4; i++) {
+            String value = getCellValueAsString(row.getCell(i)).trim();
+            if (!value.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isHeaderRow(Row row) {
+        String firstCell = getCellValueAsString(row.getCell(0)).trim();
+        String secondCell = getCellValueAsString(row.getCell(1)).trim();
+        return "ID".equalsIgnoreCase(firstCell)
+                || "Name".equalsIgnoreCase(secondCell)
+                || "Название".equalsIgnoreCase(secondCell);
+    }
+
     private String getCellValueAsString(Cell cell) {
-        if (cell == null) return "";
+        if (cell == null) {
+            return "";
+        }
         switch (cell.getCellType()) {
-            case STRING: return cell.getStringCellValue();
+            case STRING:
+                return cell.getStringCellValue();
             case NUMERIC:
-                if (DateUtil.isCellDateFormatted(cell)) return cell.getDateCellValue().toString();
-                return String.valueOf((long)cell.getNumericCellValue());
-            case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
-            case FORMULA: return cell.getCellFormula();
-            default: return "";
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString();
+                }
+                return String.valueOf((long) cell.getNumericCellValue());
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                return cell.getCellFormula();
+            default:
+                return "";
         }
     }
 }
