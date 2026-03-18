@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 // Product service with case-insensitive search logic
 @Service
 public class ProductService {
+    private static final String NAME_REQUIRED_MESSAGE = "Название товара обязательно";
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
 
@@ -42,6 +44,11 @@ public class ProductService {
     public Product saveProduct(Product product) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String role = auth.getAuthorities().iterator().next().getAuthority();
+        String normalizedName = product.getName() != null ? product.getName().trim() : "";
+
+        if (normalizedName.isEmpty()) {
+            throw new IllegalArgumentException(NAME_REQUIRED_MESSAGE);
+        }
 
         if (product.getQuantity() == null) {
             throw new IllegalArgumentException("Quantity is required");
@@ -54,7 +61,7 @@ public class ProductService {
             Product existing = productRepository.findById(product.getId()).orElseThrow();
             
             // Update fields allowed for the current role
-            existing.setName(product.getName());
+            existing.setName(normalizedName);
             existing.setQuantity(product.getQuantity());
             existing.setPhotoUrl(product.getPhotoUrl());
             
@@ -81,6 +88,7 @@ public class ProductService {
             return productRepository.save(existing);
         } else {
             // New product logic
+            product.setName(normalizedName);
             if (product.getCategory() != null && product.getCategory().getId() != null) {
                 Category category = categoryRepository.findById(product.getCategory().getId()).orElse(null);
                 product.setCategory(category);

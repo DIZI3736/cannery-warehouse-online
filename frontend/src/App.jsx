@@ -162,6 +162,37 @@ function App() {
     }
   }, [user, fetchData]);
 
+  const beginEditing = () => {
+      isEditingRef.current = true;
+      setIsEditing(true);
+  };
+
+  const endEditing = () => {
+      isEditingRef.current = false;
+      setIsEditing(false);
+  };
+
+  const endEditingLater = () => {
+      setTimeout(() => {
+          isEditingRef.current = false;
+          setIsEditing(false);
+      }, 1000);
+  };
+
+  const getApiErrorMessage = (err, fallback) => {
+      const data = err?.response?.data;
+      if (typeof data === 'string' && data.trim()) return data;
+      if (data?.message) return data.message;
+      return fallback;
+  };
+
+  const resetEditingWithError = (message, errorId = null) => {
+      setEditingErrorId(errorId);
+      setProductError(message);
+      endEditing();
+      fetchData();
+  };
+
   const addProduct = async () => {
     setProductError('');
     if (!newProduct.name.trim()) return setProductError('Введите название товара!');
@@ -173,69 +204,63 @@ function App() {
       await axios.post(API_URL + '/api/products', { ...newProduct, quantity: parseInt(newProduct.quantity), category: { id: parseInt(newProduct.categoryId) } }, authHeader());
       setNewProduct({ name: '', quantity: '', categoryId: '', photoUrl: '' });
       fetchData();
-    } catch (err) { setProductError('Ошибка при сохранении'); }
+    } catch (err) { setProductError(getApiErrorMessage(err, 'Ошибка при сохранении')); }
   };
 
   const updateProduct = async (p) => {
-      // Если поле совсем пустое, просто выходим, не восстанавливая старое значение
-      // Это позволит юзеру оставить поле пустым и потом ввести число
+      const trimmedName = (p.name || '').trim();
+      if (!trimmedName) {
+          resetEditingWithError('Название товара обязательно');
+          return;
+      }
+
       if (p.quantity === "" || p.quantity === null || p.quantity === undefined) {
-          setEditingErrorId(p.id);
-          setProductError('Введите количество!');
+          resetEditingWithError('Введите количество!', p.id);
           return; 
       }
 
       setProductError('');
       setEditingErrorId(null);
-      setIsEditing(true); 
+      beginEditing(); 
 
       let qVal = parseInt(p.quantity);
       
       if (isNaN(qVal) || qVal < 0) {
-          setEditingErrorId(p.id);
-          setProductError(qVal < 0 ? 'Минус нельзя!' : 'Введите число!');
-          setIsEditing(false);
-          fetchData(); 
+          resetEditingWithError(qVal < 0 ? 'Минус нельзя!' : 'Введите число!', p.id);
           return;
       }
       
       const catId = p.category?.id || p.categoryId;
-      setProducts(prev => prev.map(item => item.id === p.id ? { ...p, quantity: qVal, categoryId: catId } : item));
+      setProducts(prev => prev.map(item => item.id === p.id ? { ...p, name: trimmedName, quantity: qVal, categoryId: catId } : item));
 
       const productToSend = { 
           ...p, 
+          name: trimmedName,
           quantity: qVal, 
           category: (catId && catId !== "") ? { id: parseInt(catId) } : null 
       };
 
       try {
           await axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader());
-          setTimeout(() => setIsEditing(false), 1000);
+          endEditingLater();
       } catch (err) { 
-          setEditingErrorId(p.id);
-          setProductError('Ошибка сохранения'); 
-          setIsEditing(false);
-          fetchData();
+          resetEditingWithError(getApiErrorMessage(err, 'Ошибка сохранения'), p.id);
       }
   };
 
   const updatePrice = async (id, price) => {
       if (price === "" || price === null || price === undefined) {
-          setEditingErrorId(id);
-          setProductError('Введите цену!');
+          resetEditingWithError('Введите цену!', id);
           return;
       }
 
       setProductError('');
       setEditingErrorId(null);
-      setIsEditing(true);
+      beginEditing();
 
       let pVal = parseFloat(price);
       if (isNaN(pVal) || pVal < 0) {
-          setEditingErrorId(id);
-          setProductError(pVal < 0 ? 'Минус нельзя!' : 'Введите число!');
-          setIsEditing(false);
-          fetchData();
+          resetEditingWithError(pVal < 0 ? 'Минус нельзя!' : 'Введите число!', id);
           return;
       }
 
@@ -243,12 +268,9 @@ function App() {
 
       try {
           await axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader());
-          setTimeout(() => setIsEditing(false), 1000);
+          endEditingLater();
       } catch (err) { 
-          setEditingErrorId(id);
-          setProductError('Ошибка сохранения цены');
-          setIsEditing(false);
-          fetchData();
+          resetEditingWithError(getApiErrorMessage(err, 'Ошибка сохранения цены'), id);
       }
   };
 
@@ -422,7 +444,7 @@ function App() {
                       <input
                           className="form-control border-0 bg-transparent fw-bold mobile-product-name-input"
                           value={product.name}
-                          onFocus={() => setIsEditing(true)}
+                          onFocus={() => {beginEditing(); setEditingErrorId(null); setProductError('');}}
                           onChange={(e) => setLocalProductState(product.id, { name: e.target.value })}
                           onBlur={(e) => updateProduct({ ...product, name: e.target.value })}
                       />
@@ -464,7 +486,7 @@ function App() {
                               min="0"
                               className={`form-control mobile-input ${editingErrorId === product.id ? 'is-invalid' : ''}`}
                               value={product.quantity !== null && product.quantity !== undefined ? product.quantity : ''}
-                              onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
+                              onFocus={() => {beginEditing(); setEditingErrorId(null); setProductError('');}}
                               onChange={(e) => setLocalProductState(product.id, { quantity: e.target.value })}
                               onBlur={(e) => updateProduct({ ...product, quantity: e.target.value })}
                           />
@@ -485,7 +507,7 @@ function App() {
                                   min="0"
                                   className={`form-control mobile-input ${editingErrorId === product.id ? 'is-invalid' : ''}`}
                                   value={product.price !== null && product.price !== undefined ? product.price : ''}
-                                  onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
+                                  onFocus={() => {beginEditing(); setEditingErrorId(null); setProductError('');}}
                                   onChange={(e) => setLocalProductState(product.id, { price: e.target.value })}
                                   onBlur={(e) => updatePrice(product.id, e.target.value)}
                               />
@@ -719,7 +741,7 @@ function App() {
                                 {user.role === 'STOREKEEPER' ? (
                                     <input className="form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary" 
                                     value={p.name} 
-                                    onFocus={() => setIsEditing(true)}
+                                    onFocus={() => {beginEditing(); setEditingErrorId(null); setProductError('');}}
                                     onChange={(e) => setLocalProductState(p.id, { name: e.target.value })}
                                     onBlur={(e) => { updateProduct({...p, name: e.target.value}); }} />
                                     ) : <div className="fw-bold">{p.name}</div>}
@@ -754,7 +776,7 @@ function App() {
                                     <>
                                         <input type="number" min="0" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
                                             value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
-                                            onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
+                                            onFocus={() => {beginEditing(); setEditingErrorId(null); setProductError('');}}
                                             onChange={(e) => setLocalProductState(p.id, { quantity: e.target.value })}
                                             onBlur={(e) => { updateProduct({...p, quantity: e.target.value}); }} />
                                         {editingErrorId === p.id && <div className="text-danger small fw-bold" style={{fontSize: '0.65rem'}}>⚠️</div>}
@@ -771,7 +793,7 @@ function App() {
                                         <div className="d-flex align-items-center">
                                             <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 ${editingErrorId === p.id ? 'is-invalid' : ''}`} 
                                                 value={p.price !== null && p.price !== undefined ? p.price : ''} 
-                                                onFocus={() => {setIsEditing(true); setEditingErrorId(null); setProductError('');}}
+                                                onFocus={() => {beginEditing(); setEditingErrorId(null); setProductError('');}}
                                                 onChange={(e) => setLocalProductState(p.id, { price: e.target.value })}
                                                 onBlur={(e) => { updatePrice(p.id, e.target.value); }} />
                                             <span className="ms-1 fw-bold">₽</span>
