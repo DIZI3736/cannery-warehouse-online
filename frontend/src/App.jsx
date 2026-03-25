@@ -261,8 +261,7 @@ function App() {
 
     const headers = { headers: { Authorization: token } };
     const query = buildFilterQueryString();
-    const cacheBuster = `_ts=${Date.now()}`;
-    const url = `${API_URL}/api/products/stats?${query ? `${query}&${cacheBuster}` : cacheBuster}`;
+    const url = `${API_URL}/api/products/stats${query ? `?${query}` : ''}`;
 
     try {
       const statsRes = await axios.get(url, headers);
@@ -278,11 +277,10 @@ function App() {
     const headers = { headers: { Authorization: token } };
     try {
       const query = buildFilterQueryString();
-      const cacheBuster = `_ts=${Date.now()}`;
-      const suffix = query ? `?${query}&${cacheBuster}` : `?${cacheBuster}`;
+      const suffix = query ? `?${query}` : '';
       const [pRes, cRes] = await Promise.all([
           axios.get(`${API_URL}/api/products${suffix}`, headers),
-          axios.get(`${API_URL}/api/categories?${cacheBuster}`, headers)
+          axios.get(API_URL + '/api/categories', headers)
       ]);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
       
@@ -312,33 +310,14 @@ function App() {
     }
   }, [user, fetchData]);
 
-  // Интервал автоматического обновления (1 секунда)
+  // Интервал автоматического обновления (5 секунд)
   useEffect(() => {
     if (user) {
         const interval = setInterval(() => {
             fetchData();
-        }, 1000); 
+        }, 5000); 
         return () => clearInterval(interval);
     }
-  }, [user, fetchData]);
-
-  // Браузер может замедлять таймеры в фоновой вкладке, поэтому обновляемся сразу при возврате.
-  useEffect(() => {
-    if (!user) return undefined;
-
-    const syncOnReturn = () => {
-      if (document.visibilityState === 'visible') {
-        fetchData();
-      }
-    };
-
-    window.addEventListener('focus', syncOnReturn);
-    document.addEventListener('visibilitychange', syncOnReturn);
-
-    return () => {
-      window.removeEventListener('focus', syncOnReturn);
-      document.removeEventListener('visibilitychange', syncOnReturn);
-    };
   }, [user, fetchData]);
 
   const beginEditing = () => {
@@ -818,8 +797,8 @@ function App() {
              <p className="text-muted small">Система управления складом консервного завода</p>
           </div>
           <form onSubmit={login}>
-            <div className="mb-3"><label className="small fw-bold text-secondary">ЛОГИН</label><input className="form-control rounded-3" value={username} autoCapitalize="none" autoCorrect="off" autoComplete="username" spellCheck={false} onChange={e => {setUsername(e.target.value); setLoginError('');}} /></div>
-            <div className="mb-4"><label className="small fw-bold text-secondary">ПАРОЛЬ</label><input className="form-control rounded-3" type="password" autoCapitalize="none" autoCorrect="off" autoComplete="current-password" inputMode="numeric" value={password} onChange={e => {setPassword(e.target.value); setLoginError('');}} /></div>
+            <div className="mb-3"><label className="small fw-bold text-secondary">ЛОГИН</label><input className="form-control rounded-3" value={username} onChange={e => {setUsername(e.target.value); setLoginError('');}} /></div>
+            <div className="mb-4"><label className="small fw-bold text-secondary">ПАРОЛЬ</label><input className="form-control rounded-3" type="password" value={password} onChange={e => {setPassword(e.target.value); setLoginError('');}} /></div>
             
             {loginError && (
               <div className="alert alert-danger py-2 small fw-bold text-center mb-3 rounded-3" style={{fontSize: '0.85rem'}}>
@@ -833,9 +812,9 @@ function App() {
           </form>
           <div className="mt-5 pt-4 border-top">
              <div className="row g-2">
-                <div className="col-12"><button type="button" className="btn btn-outline-success w-100 fw-bold" onClick={(e) => login(e, 'storekeeper')}>ВОЙТИ КАК КЛАДОВЩИК</button></div>
-                <div className="col-12"><button type="button" className="btn btn-outline-primary w-100 fw-bold" onClick={(e) => login(e, 'manager')}>ВОЙТИ КАК МЕНЕДЖЕР</button></div>
-                <div className="col-12"><button type="button" className="btn btn-outline-info w-100 fw-bold" onClick={(e) => login(e, 'accountant')}>ВОЙТИ КАК БУХГАЛТЕР</button></div>
+                <div className="col-12"><button className="btn btn-outline-success w-100 fw-bold" onClick={() => {setUsername('storekeeper'); setLoginError('');}}>КЛАДОВЩИК</button></div>
+                <div className="col-12"><button className="btn btn-outline-primary w-100 fw-bold" onClick={() => {setUsername('manager'); setLoginError('');}}>МЕНЕДЖЕР</button></div>
+                <div className="col-12"><button className="btn btn-outline-info w-100 fw-bold" onClick={() => {setUsername('accountant'); setLoginError('');}}>БУХГАЛТЕР</button></div>
              </div>
           </div>
         </div>
