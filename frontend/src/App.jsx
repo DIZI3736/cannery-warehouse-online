@@ -818,8 +818,8 @@ function App() {
              <p className="text-muted small">Система управления складом консервного завода</p>
           </div>
           <form onSubmit={login}>
-            <div className="mb-3"><label className="small fw-bold text-secondary">ЛОГИН</label><input className="form-control rounded-3" value={username} onChange={e => {setUsername(e.target.value); setLoginError('');}} /></div>
-            <div className="mb-4"><label className="small fw-bold text-secondary">ПАРОЛЬ</label><input className="form-control rounded-3" type="password" value={password} onChange={e => {setPassword(e.target.value); setLoginError('');}} /></div>
+            <div className="mb-3"><label className="small fw-bold text-secondary">ЛОГИН</label><input className="form-control rounded-3" value={username} autoCapitalize="none" autoCorrect="off" autoComplete="username" spellCheck={false} onChange={e => {setUsername(e.target.value); setLoginError('');}} /></div>
+            <div className="mb-4"><label className="small fw-bold text-secondary">ПАРОЛЬ</label><input className="form-control rounded-3" type="password" autoCapitalize="none" autoCorrect="off" autoComplete="current-password" inputMode="numeric" value={password} onChange={e => {setPassword(e.target.value); setLoginError('');}} /></div>
             
             {loginError && (
               <div className="alert alert-danger py-2 small fw-bold text-center mb-3 rounded-3" style={{fontSize: '0.85rem'}}>
@@ -833,9 +833,9 @@ function App() {
           </form>
           <div className="mt-5 pt-4 border-top">
              <div className="row g-2">
-                <div className="col-12"><button className="btn btn-outline-success w-100 fw-bold" onClick={() => {setUsername('storekeeper'); setLoginError('');}}>КЛАДОВЩИК</button></div>
-                <div className="col-12"><button className="btn btn-outline-primary w-100 fw-bold" onClick={() => {setUsername('manager'); setLoginError('');}}>МЕНЕДЖЕР</button></div>
-                <div className="col-12"><button className="btn btn-outline-info w-100 fw-bold" onClick={() => {setUsername('accountant'); setLoginError('');}}>БУХГАЛТЕР</button></div>
+                <div className="col-12"><button type="button" className="btn btn-outline-success w-100 fw-bold" onClick={(e) => login(e, 'storekeeper')}>ВОЙТИ КАК КЛАДОВЩИК</button></div>
+                <div className="col-12"><button type="button" className="btn btn-outline-primary w-100 fw-bold" onClick={(e) => login(e, 'manager')}>ВОЙТИ КАК МЕНЕДЖЕР</button></div>
+                <div className="col-12"><button type="button" className="btn btn-outline-info w-100 fw-bold" onClick={(e) => login(e, 'accountant')}>ВОЙТИ КАК БУХГАЛТЕР</button></div>
              </div>
           </div>
         </div>
