@@ -261,7 +261,8 @@ function App() {
 
     const headers = { headers: { Authorization: token } };
     const query = buildFilterQueryString();
-    const url = `${API_URL}/api/products/stats${query ? `?${query}` : ''}`;
+    const cacheBuster = `_ts=${Date.now()}`;
+    const url = `${API_URL}/api/products/stats?${query ? `${query}&${cacheBuster}` : cacheBuster}`;
 
     try {
       const statsRes = await axios.get(url, headers);
@@ -277,10 +278,11 @@ function App() {
     const headers = { headers: { Authorization: token } };
     try {
       const query = buildFilterQueryString();
-      const suffix = query ? `?${query}` : '';
+      const cacheBuster = `_ts=${Date.now()}`;
+      const suffix = query ? `?${query}&${cacheBuster}` : `?${cacheBuster}`;
       const [pRes, cRes] = await Promise.all([
           axios.get(`${API_URL}/api/products${suffix}`, headers),
-          axios.get(API_URL + '/api/categories', headers)
+          axios.get(`${API_URL}/api/categories?${cacheBuster}`, headers)
       ]);
       const sortedProducts = (pRes.data || []).sort((a, b) => a.id - b.id);
       
@@ -318,6 +320,25 @@ function App() {
         }, 1000); 
         return () => clearInterval(interval);
     }
+  }, [user, fetchData]);
+
+  // Браузер может замедлять таймеры в фоновой вкладке, поэтому обновляемся сразу при возврате.
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const syncOnReturn = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+
+    window.addEventListener('focus', syncOnReturn);
+    document.addEventListener('visibilitychange', syncOnReturn);
+
+    return () => {
+      window.removeEventListener('focus', syncOnReturn);
+      document.removeEventListener('visibilitychange', syncOnReturn);
+    };
   }, [user, fetchData]);
 
   const beginEditing = () => {
