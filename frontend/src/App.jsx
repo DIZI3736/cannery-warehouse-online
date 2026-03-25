@@ -310,12 +310,12 @@ function App() {
     }
   }, [user, fetchData]);
 
-  // Интервал автоматического обновления (5 секунд)
+  // Интервал автоматического обновления (1 секунда)
   useEffect(() => {
     if (user) {
         const interval = setInterval(() => {
             fetchData();
-        }, 5000); 
+        }, 1000); 
         return () => clearInterval(interval);
     }
   }, [user, fetchData]);
