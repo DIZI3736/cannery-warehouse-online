@@ -69,24 +69,36 @@ const normalizeOptionalText = (value = '') => {
   return trimmed ? trimmed : '';
 };
 
+const normalizeApiBase = (value) => String(value || '').replace(/\/+$/, '');
+
 const resolvePhotoUrl = (value) => {
   const raw = typeof value === 'string' ? value.trim() : '';
   if (!raw) return FALLBACK_IMAGE;
+  const apiBase = normalizeApiBase(API_URL);
 
   if (raw.startsWith('/')) {
-    return `${API_URL}${raw}`;
+    return apiBase ? `${apiBase}${raw}` : raw;
+  }
+
+  if (!/^https?:\/\//i.test(raw)) {
+    const normalizedRelative = raw.replace(/^\.?\/*/, '');
+    return apiBase ? `${apiBase}/${normalizedRelative}` : raw;
   }
 
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(raw)) {
     try {
       const parsed = new URL(raw);
-      return `${API_URL}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      return apiBase ? `${apiBase}${parsed.pathname}${parsed.search}${parsed.hash}` : raw;
     } catch {
       return raw;
     }
   }
 
-  return raw;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && raw.startsWith('http://')) {
+    return `https://${raw.slice('http://'.length)}`;
+  }
+
+  return encodeURI(raw);
 };
 
 const normalizeCategoryName = (value) => {

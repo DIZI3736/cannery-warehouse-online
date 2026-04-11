@@ -744,7 +744,7 @@ body {
     justify-content: space-between;
     margin-top: 24px;
     padding-top: 18px;
-    border-top: 1px solid #e6edf5;
+    border-top: 2px solid #d8e3ef;
 }
 
 .app-modal-actions-buttons {
@@ -872,6 +872,7 @@ body {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 16px;
+    margin-bottom: 10px;
 }
 
 .product-details-form-field {
@@ -904,6 +905,24 @@ body {
     min-height: 132px;
     max-height: 220px;
     resize: vertical;
+    margin-bottom: 8px;
+}
+
+.product-details-modal .app-modal-actions-buttons .btn {
+    border-width: 2px;
+    border-style: solid;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.product-details-modal .app-modal-actions-buttons .btn-light {
+    border-color: #d6e0eb;
+    background: #f8fafc;
+    color: #111827;
+}
+
+.product-details-modal .app-modal-actions-buttons .btn-primary {
+    border-color: #1f6feb;
+    box-shadow: 0 14px 30px rgba(31, 111, 235, 0.22);
 }
 
 .app-modal-open {
@@ -1937,15 +1956,20 @@ body {
 
     .app-modal-actions-with-status {
         align-items: stretch;
+        margin-top: 20px;
+        padding-top: 20px;
     }
 
     .app-modal-actions-buttons {
         width: 100%;
         margin-left: 0;
+        gap: 12px;
     }
 
     .app-modal-actions .btn {
         width: 100%;
+        min-height: 56px;
+        border-radius: 18px;
     }
 
     .product-details-top {
@@ -1956,6 +1980,14 @@ body {
         width: min(100%, calc(100vw - 24px));
         padding: 20px 16px 18px;
         border-radius: 28px 28px 20px 20px;
+    }
+
+    .product-details-form-grid {
+        margin-bottom: 14px;
+    }
+
+    .product-details-notes {
+        margin-bottom: 14px;
     }
 
     .product-details-photo-frame {
