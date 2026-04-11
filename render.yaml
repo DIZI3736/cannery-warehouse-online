@@ -16,10 +16,12 @@ services:
         sync: false
       - key: SPRING_DATASOURCE_DRIVER_CLASS_NAME
         value: org.postgresql.Driver
-      - key: SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT
-        value: org.hibernate.dialect.PostgreSQLDialect
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: update
+        value: none
+      - key: SPRING_JPA_SHOW_SQL
+        value: "false"
+      - key: SPRING_JPA_OPEN_IN_VIEW
+        value: "false"
 
     # Frontend Service (Vite Static Site)  
   - type: web
@@ -29,7 +31,7 @@ services:
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL
-        value: https://cannery-backend.onrender.com
+        value: https://cannery-backend-vlih.onrender.com
     routes:
       - type: rewrite
         source: /*

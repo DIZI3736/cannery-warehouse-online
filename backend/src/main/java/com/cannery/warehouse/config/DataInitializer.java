@@ -46,22 +46,39 @@ public class DataInitializer {
                 createProd(productRepository, "Скумбрия в масле", inOil, 1400, "165.00", "https://images.satu.kz/165531802_konservy-skumbriya-v.jpg");
                 createProd(productRepository, "Тунец (куски)", natural, 110, "195.00", "https://api.e-dostavka.by/UserFiles/images/catalog/Goods/7428/01497428/norm/01497428.n_1.png");
                 createProd(productRepository, "Сардины в масле", inOil, 200, "125.00", "https://tse4.mm.bing.net/th/id/OIP._cRPGWpfmn7YunKLcU1QRwHaEU?rs=1&pid=ImgDetMain&o=7&rm=3");
+                syncMissingPrices(productRepository);
             }
 
-            syncMissingPrices(productRepository);
         };
     }
 
     private void ensureDefaultUser(UserRepository repo, PasswordEncoder enc, String login, String name, Role role, Random random) {
         User user = repo.findByUsername(login).orElseGet(User::new);
-        user.setUsername(login);
-        user.setPassword(enc.encode("1234"));
-        user.setFullName(name);
-        user.setRole(role);
+        boolean changed = false;
+
+        if (user.getUsername() == null || !user.getUsername().equals(login)) {
+            user.setUsername(login);
+            changed = true;
+        }
+        if (user.getPassword() == null || user.getPassword().isBlank() || !enc.matches("1234", user.getPassword())) {
+            user.setPassword(enc.encode("1234"));
+            changed = true;
+        }
+        if (user.getFullName() == null || !user.getFullName().equals(name)) {
+            user.setFullName(name);
+            changed = true;
+        }
+        if (user.getRole() != role) {
+            user.setRole(role);
+            changed = true;
+        }
         if (user.getPhone() == null || user.getPhone().isBlank()) {
             user.setPhone("+7 (9" + (10 + random.nextInt(89)) + ") " + (100 + random.nextInt(899)) + "-" + (10 + random.nextInt(89)));
+            changed = true;
         }
-        repo.save(user);
+        if (changed) {
+            repo.save(user);
+        }
     }
 
     private Category saveCat(CategoryRepository repo, String name) {
