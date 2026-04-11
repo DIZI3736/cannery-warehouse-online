@@ -69,6 +69,26 @@ const normalizeOptionalText = (value = '') => {
   return trimmed ? trimmed : '';
 };
 
+const resolvePhotoUrl = (value) => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return FALLBACK_IMAGE;
+
+  if (raw.startsWith('/')) {
+    return `${API_URL}${raw}`;
+  }
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      return `${API_URL}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return raw;
+    }
+  }
+
+  return raw;
+};
+
 const normalizeCategoryName = (value) => {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized || normalized.toLowerCase() === 'undefined' || normalized.toLowerCase() === 'null') {
@@ -412,7 +432,7 @@ function PhotoLinkDialog({ open, value, error, loading, onChange, onCancel, onCo
         </p>
         <div className="photo-link-preview">
           <img
-            src={value.trim() || FALLBACK_IMAGE}
+            src={resolvePhotoUrl(value)}
             alt="Предпросмотр фото"
             onError={(event) => { event.currentTarget.src = FALLBACK_IMAGE; }}
           />
@@ -484,7 +504,7 @@ function ProductDetailsDialog({ open, product, canEdit, loading, successMessage,
             <div className="product-details-photo-frame">
               <div className="product-details-photo">
                 <img
-                  src={product.photoUrl || FALLBACK_IMAGE}
+                  src={resolvePhotoUrl(product.photoUrl)}
                   alt={product.name || 'Товар'}
                   onError={(event) => { event.target.src = FALLBACK_IMAGE; }}
                 />
@@ -1618,7 +1638,7 @@ function App() {
       <div key={product.id} className="card mobile-product-card shadow-sm border-0 rounded-4">
           <div className="mobile-product-header">
               <div className="product-img-container mobile-product-image">
-                  <img src={product.photoUrl || FALLBACK_IMAGE} className="product-img" onError={e => e.target.src = FALLBACK_IMAGE} />
+                  <img src={resolvePhotoUrl(product.photoUrl)} className="product-img" onError={e => e.target.src = FALLBACK_IMAGE} />
               </div>
               <div className="mobile-product-main">
                   {user.role === 'STOREKEEPER' ? (
@@ -1965,7 +1985,7 @@ function App() {
                     <div className="col-12 col-md-3">
                         <div className="d-flex align-items-center gap-2 intake-photo-row">
                             {newProduct.photoUrl && (
-                                <img src={newProduct.photoUrl} className="rounded-2 shadow-sm border intake-photo-preview" style={{width: '38px', height: '38px', objectFit: 'cover'}} 
+                                <img src={resolvePhotoUrl(newProduct.photoUrl)} className="rounded-2 shadow-sm border intake-photo-preview" style={{width: '38px', height: '38px', objectFit: 'cover'}} 
                                      onError={(e) => e.target.style.display = 'none'} 
                                      onLoad={(e) => e.target.style.display = 'block'} />
                             )}
@@ -2089,7 +2109,7 @@ function App() {
 
                                 return (
                                 <tr key={p.id}>
-                                    <td data-label="Фото"><div className="product-img-container product-img-container-table"><img src={p.photoUrl || FALLBACK_IMAGE} className="product-img product-img-table" onError={e=>e.target.src=FALLBACK_IMAGE}/></div></td>
+                                    <td data-label="Фото"><div className="product-img-container product-img-container-table"><img src={resolvePhotoUrl(p.photoUrl)} className="product-img product-img-table" onError={e=>e.target.src=FALLBACK_IMAGE}/></div></td>
                                      <td data-label="Наименование">
                                          {user.role === 'STOREKEEPER' ? (
                                              <div className="product-edit-cell">
