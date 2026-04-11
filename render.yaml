@@ -22,6 +22,14 @@ services:
         value: "false"
       - key: SPRING_JPA_OPEN_IN_VIEW
         value: "false"
+      - key: SPRING_MAIN_LAZY_INITIALIZATION
+        value: "true"
+      - key: SPRING_DATA_JPA_REPOSITORIES_BOOTSTRAP_MODE
+        value: lazy
+      - key: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+        value: "0"
+      - key: SPRING_DATASOURCE_HIKARI_INITIALIZATION_FAIL_TIMEOUT
+        value: "1"
 
     # Frontend Service (Vite Static Site)  
   - type: web
