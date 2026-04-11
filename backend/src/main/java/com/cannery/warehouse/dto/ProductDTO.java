@@ -10,6 +10,11 @@ public class ProductDTO {
     private Integer quantity;
     private String photoUrl;
     private BigDecimal price;
+    private String notes;
+    private String qualityStatus;
+    private String packagingType;
+    private String manufacturer;
+    private String brand;
 
     public ProductDTO() {}
 
@@ -28,4 +33,14 @@ public class ProductDTO {
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public String getQualityStatus() { return qualityStatus; }
+    public void setQualityStatus(String qualityStatus) { this.qualityStatus = qualityStatus; }
+    public String getPackagingType() { return packagingType; }
+    public void setPackagingType(String packagingType) { this.packagingType = packagingType; }
+    public String getManufacturer() { return manufacturer; }
+    public void setManufacturer(String manufacturer) { this.manufacturer = manufacturer; }
+    public String getBrand() { return brand; }
+    public void setBrand(String brand) { this.brand = brand; }
 }

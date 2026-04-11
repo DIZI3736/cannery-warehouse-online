@@ -4,8 +4,6 @@ import com.cannery.warehouse.dto.ProductDTO;
 import com.cannery.warehouse.dto.ProductStatsDTO;
 import com.cannery.warehouse.model.Product;
 import com.cannery.warehouse.model.Role;
-import com.cannery.warehouse.repository.CategoryRepository;
-import com.cannery.warehouse.repository.ProductRepository;
 import com.cannery.warehouse.service.ExcelService;
 import com.cannery.warehouse.service.ProductService;
 import com.cannery.warehouse.service.ProductStatsService;
@@ -46,22 +44,16 @@ public class ProductController {
     private final ProductService productService;
     private final ProductStatsService productStatsService;
     private final ExcelService excelService;
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
 
     @Value("${upload.path:uploads}")
     private String uploadPath;
 
     public ProductController(ProductService productService,
                              ProductStatsService productStatsService,
-                             ExcelService excelService,
-                             ProductRepository productRepository,
-                             CategoryRepository categoryRepository) {
+                             ExcelService excelService) {
         this.productService = productService;
         this.productStatsService = productStatsService;
         this.excelService = excelService;
-        this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
     }
 
     @GetMapping
@@ -72,18 +64,24 @@ public class ProductController {
         String role = auth.getAuthorities().iterator().next().getAuthority();
         boolean hidePrice = "STOREKEEPER".equals(role);
 
-        return products.stream().map(p -> {
+        return products.stream().map(product -> {
             ProductDTO dto = new ProductDTO();
-            dto.setId(p.getId());
-            dto.setName(p.getName());
-            dto.setQuantity(p.getQuantity());
-            dto.setPhotoUrl(p.getPhotoUrl());
-            if (p.getCategory() != null) {
-                dto.setCategoryName(p.getCategory().getName());
-                dto.setCategoryId(p.getCategory().getId());
+            dto.setId(product.getId());
+            dto.setName(product.getName());
+            dto.setQuantity(product.getQuantity());
+            dto.setPhotoUrl(product.getPhotoUrl());
+            dto.setNotes(product.getNotes());
+            dto.setQualityStatus(product.getQualityStatus() != null ? product.getQualityStatus().name() : null);
+            dto.setPackagingType(product.getPackagingType() != null ? product.getPackagingType().name() : null);
+            dto.setManufacturer(product.getManufacturer());
+            dto.setBrand(product.getBrand());
+
+            if (product.getCategory() != null) {
+                dto.setCategoryName(product.getCategory().getName());
+                dto.setCategoryId(product.getCategory().getId());
             }
             if (!hidePrice) {
-                dto.setPrice(p.getPrice());
+                dto.setPrice(product.getPrice());
             }
             return dto;
         }).collect(Collectors.toList());
@@ -128,13 +126,12 @@ public class ProductController {
     @GetMapping("/export")
     @PreAuthorize("hasAnyAuthority('ACCOUNTANT', 'SALES_MANAGER', 'STOREKEEPER')")
     public ResponseEntity<Resource> getFile() {
-        String filename = "products.xlsx";
         InputStreamResource file = new InputStreamResource(
                 excelService.productsToExcel(productService.getAllProducts(null, null))
         );
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=products.xlsx")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(file);
     }
@@ -142,30 +139,21 @@ public class ProductController {
     @PostMapping("/import")
     @PreAuthorize("hasAnyAuthority('STOREKEEPER', 'ACCOUNTANT')")
     public ResponseEntity<?> importExcel(@RequestParam("file") MultipartFile file) {
-        System.out.println(">>> IMPORT STARTED for file: " + file.getOriginalFilename());
         try {
-            excelService.save(file, productRepository, categoryRepository);
-            System.out.println(">>> IMPORT SUCCESS");
-            return ResponseEntity.ok("Import successful");
+            excelService.save(file);
+            return ResponseEntity.ok("Импорт завершен");
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
-            String errorMsg = e.getMessage() != null ? e.getMessage() : "Некорректные данные в Excel";
-            System.out.println(">>> IMPORT FAILED: " + errorMsg);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Ошибка при импорте: " + errorMsg);
-        } catch (Throwable t) {
-            t.printStackTrace();
-            String errorMsg = t.getMessage() != null ? t.getMessage() : t.toString();
-            System.out.println(">>> IMPORT FAILED: " + errorMsg);
+                    .body("Ошибка при импорте: " + e.getMessage());
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Ошибка при импорте: " + errorMsg);
+                    .body("Ошибка при импорте: " + (e.getMessage() != null ? e.getMessage() : "неизвестная ошибка"));
         }
     }
 
     @PostMapping("/upload")
     @PreAuthorize("permitAll()")
     public ResponseEntity<String> uploadPhoto(@RequestParam("file") MultipartFile file) {
-        System.out.println("Received upload request for file: " + file.getOriginalFilename());
         try {
             Files.createDirectories(Paths.get(uploadPath));
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
@@ -173,7 +161,6 @@ public class ProductController {
             Files.write(path, file.getBytes());
             return ResponseEntity.ok("/api/products/photos/" + fileName);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).body("Error uploading file: " + e.getMessage());
         }
     }

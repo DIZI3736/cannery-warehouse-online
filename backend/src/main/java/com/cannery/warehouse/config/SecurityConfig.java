@@ -1,9 +1,9 @@
 package com.cannery.warehouse.config;
 
 import com.cannery.warehouse.repository.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -41,7 +41,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/**").authenticated()
                         .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults());
+                .httpBasic(httpBasic -> httpBasic.authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                }));
 
         return http.build();
     }
@@ -49,6 +51,7 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService(UserRepository userRepository) {
         return username -> userRepository.findByUsername(username)
+                .filter(u -> u.getPassword() != null && !u.getPassword().isBlank() && u.getRole() != null)
                 .map(u -> org.springframework.security.core.userdetails.User.builder()
                         .username(u.getUsername())
                         .password(u.getPassword())

@@ -69,7 +69,7 @@ public class ProductStatsService {
 
         for (Product product : products) {
             int quantity = product.getQuantity() != null ? product.getQuantity() : 0;
-            String categoryName = product.getCategory() != null ? product.getCategory().getName() : "undefined";
+            String categoryName = product.getCategory() != null ? product.getCategory().getName() : "Без категории";
 
             categoryTotals.merge(categoryName, quantity, Integer::sum);
             totalQuantity += quantity;

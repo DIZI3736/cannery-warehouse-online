@@ -27,12 +27,13 @@ public class DataInitializer {
             ProductRepository productRepository,
             PasswordEncoder passwordEncoder) {
         return args -> {
-            if (userRepository.count() == 0) {
-                Random r = new Random();
-                autoCreateUser(userRepository, passwordEncoder, "storekeeper", "Иван Кладовщик", Role.STOREKEEPER, r);
-                autoCreateUser(userRepository, passwordEncoder, "manager", "Анна Менеджер сбыта", Role.SALES_MANAGER, r);
-                autoCreateUser(userRepository, passwordEncoder, "accountant", "Петр Бухгалтер", Role.ACCOUNTANT, r);
+            Random random = new Random();
 
+            ensureDefaultUser(userRepository, passwordEncoder, "storekeeper", "Иван Кладовщик", Role.STOREKEEPER, random);
+            ensureDefaultUser(userRepository, passwordEncoder, "manager", "Анна Менеджер сбыта", Role.SALES_MANAGER, random);
+            ensureDefaultUser(userRepository, passwordEncoder, "accountant", "Петр Бухгалтер", Role.ACCOUNTANT, random);
+
+            if (productRepository.count() == 0) {
                 Category natural = saveCat(categoryRepository, "Натуральные");
                 Category inOil = saveCat(categoryRepository, "В масле");
                 Category inTomato = saveCat(categoryRepository, "В томате");
@@ -51,13 +52,15 @@ public class DataInitializer {
         };
     }
 
-    private void autoCreateUser(UserRepository repo, PasswordEncoder enc, String login, String name, Role role, Random r) {
-        User user = new User();
+    private void ensureDefaultUser(UserRepository repo, PasswordEncoder enc, String login, String name, Role role, Random random) {
+        User user = repo.findByUsername(login).orElseGet(User::new);
         user.setUsername(login);
         user.setPassword(enc.encode("1234"));
         user.setFullName(name);
         user.setRole(role);
-        user.setPhone("+7 (9" + (10 + r.nextInt(89)) + ") " + (100 + r.nextInt(899)) + "-" + (10 + r.nextInt(89)));
+        if (user.getPhone() == null || user.getPhone().isBlank()) {
+            user.setPhone("+7 (9" + (10 + random.nextInt(89)) + ") " + (100 + random.nextInt(899)) + "-" + (10 + random.nextInt(89)));
+        }
         repo.save(user);
     }
 

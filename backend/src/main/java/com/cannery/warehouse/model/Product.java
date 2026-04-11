@@ -20,6 +20,21 @@ public class Product {
 
     private BigDecimal price;
 
+    @Column(length = 1000)
+    private String notes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 40)
+    private QualityStatus qualityStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 40)
+    private PackagingType packagingType;
+
+    private String manufacturer;
+
+    private String brand;
+
     public Long getId() {
         return id;
     }
@@ -66,5 +81,45 @@ public class Product {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    public QualityStatus getQualityStatus() {
+        return qualityStatus;
+    }
+
+    public void setQualityStatus(QualityStatus qualityStatus) {
+        this.qualityStatus = qualityStatus;
+    }
+
+    public PackagingType getPackagingType() {
+        return packagingType;
+    }
+
+    public void setPackagingType(PackagingType packagingType) {
+        this.packagingType = packagingType;
+    }
+
+    public String getManufacturer() {
+        return manufacturer;
+    }
+
+    public void setManufacturer(String manufacturer) {
+        this.manufacturer = manufacturer;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
     }
 }
