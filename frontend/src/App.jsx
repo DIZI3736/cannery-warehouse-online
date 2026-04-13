@@ -4,6 +4,11 @@ import { createPortal } from 'react-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 const FALLBACK_IMAGE = 'https://cdn-icons-png.flaticon.com/512/1170/1170628.png';
+const PRODUCT_IMAGE_FALLBACKS = {
+  'Шпроты в масле': '/product-images/sprats.jpg',
+  'Килька в томате': '/product-images/kilka-tomato.png',
+  'Сардины в масле': '/product-images/sardines.png'
+};
 const EMPTY_PRODUCT_STATS = { deficitItems: [], totalValue: 0, categoryStats: [] };
 const EMPTY_JOURNAL_FILTERS = { productName: '', startDate: '', endDate: '' };
 const EMPTY_NEW_PRODUCT = {
@@ -100,6 +105,8 @@ const resolvePhotoUrl = (value) => {
 
   return encodeURI(raw);
 };
+
+const getProductFallbackImage = (name) => PRODUCT_IMAGE_FALLBACKS[name] || FALLBACK_IMAGE;
 
 const normalizeCategoryName = (value) => {
   const normalized = typeof value === 'string' ? value.trim() : '';
@@ -518,7 +525,7 @@ function ProductDetailsDialog({ open, product, canEdit, loading, successMessage,
                 <img
                   src={resolvePhotoUrl(product.photoUrl)}
                   alt={product.name || 'Товар'}
-                  onError={(event) => { event.target.src = FALLBACK_IMAGE; }}
+                  onError={(event) => { event.currentTarget.src = getProductFallbackImage(product.name); }}
                 />
               </div>
             </div>
@@ -733,6 +740,7 @@ function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClo
 
 function App() {
   const [user, setUser] = useState(null);
+  const [authToken, setAuthToken] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [products, setProducts] = useState([]);
@@ -832,7 +840,7 @@ function App() {
     return ROLE_LABELS[role] || role;
   };
 
-  const authHeader = () => ({ headers: { Authorization: localStorage.getItem('token') } });
+  const authHeader = () => ({ headers: { Authorization: authToken } });
 
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -869,7 +877,8 @@ function App() {
     
     try {
       const res = await axios.get(API_URL + '/api/auth/me', { headers: { Authorization: token } });
-      localStorage.setItem('token', token);
+      localStorage.removeItem('token');
+      setAuthToken(token);
       setShowPassword(false);
       setUser(res.data);
     } catch (err) { 
@@ -895,6 +904,7 @@ function App() {
 
   const logout = () => {
       localStorage.removeItem('token');
+      setAuthToken('');
       setUser(null);
       setLoginError('');
       setUsername('');
@@ -959,7 +969,7 @@ function App() {
   }, []);
 
   const fetchProductStats = useCallback(async (currentToken, ignoreEditingGuard = false, fallbackProducts = []) => {
-    const token = currentToken || localStorage.getItem('token');
+    const token = currentToken || authToken;
     if (!token) return;
 
     const headers = { headers: { Authorization: token } };
@@ -972,10 +982,10 @@ function App() {
     } catch (err) {
       applyProductStats(buildFallbackProductStats(fallbackProducts), ignoreEditingGuard);
     }
-  }, [applyProductStats, buildFallbackProductStats, buildFilterQueryString]);
+  }, [applyProductStats, authToken, buildFallbackProductStats, buildFilterQueryString]);
 
   const fetchData = useCallback(async (currentToken) => {
-    const token = currentToken || localStorage.getItem('token');
+    const token = currentToken || authToken;
     if (!token) return;
     const headers = { headers: { Authorization: token } };
     try {
@@ -1008,16 +1018,9 @@ function App() {
 
   // Первоначальная загрузка и восстановление сессии
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        axios.get(API_URL + '/api/auth/me', { headers: { Authorization: token } })
-            .then(res => {
-                setUser(res.data);
-            })
-            .catch(() => {
-                localStorage.removeItem('token');
-            });
-    }
+    localStorage.removeItem('token');
+    setAuthToken('');
+    setUser(null);
   }, []);
 
   useEffect(() => {
@@ -1437,7 +1440,7 @@ function App() {
   }, []);
 
   const fetchActivityLogData = useCallback(async () => {
-      const token = localStorage.getItem('token');
+      const token = authToken;
       if (!token) return;
       setActivityLogLoading(true);
       try {
@@ -1456,7 +1459,7 @@ function App() {
       } finally {
           setActivityLogLoading(false);
       }
-  }, [journalFilters]);
+  }, [authToken, journalFilters]);
 
   const openActivityJournal = () => {
       setActivityLogOpen(true);
@@ -1650,7 +1653,7 @@ function App() {
       <div key={product.id} className="card mobile-product-card shadow-sm border-0 rounded-4">
           <div className="mobile-product-header">
               <div className="product-img-container mobile-product-image">
-                  <img src={resolvePhotoUrl(product.photoUrl)} className="product-img" onError={e => e.target.src = FALLBACK_IMAGE} />
+                  <img src={resolvePhotoUrl(product.photoUrl)} className="product-img" onError={e => { e.currentTarget.src = getProductFallbackImage(product.name); }} />
               </div>
               <div className="mobile-product-main">
                   {user.role === 'STOREKEEPER' ? (
@@ -2121,7 +2124,7 @@ function App() {
 
                                 return (
                                 <tr key={p.id}>
-                                    <td data-label="Фото"><div className="product-img-container product-img-container-table"><img src={resolvePhotoUrl(p.photoUrl)} className="product-img product-img-table" onError={e=>e.target.src=FALLBACK_IMAGE}/></div></td>
+                                    <td data-label="Фото"><div className="product-img-container product-img-container-table"><img src={resolvePhotoUrl(p.photoUrl)} className="product-img product-img-table" onError={e => { e.currentTarget.src = getProductFallbackImage(p.name); }} /></div></td>
                                      <td data-label="Наименование">
                                          {user.role === 'STOREKEEPER' ? (
                                              <div className="product-edit-cell">
