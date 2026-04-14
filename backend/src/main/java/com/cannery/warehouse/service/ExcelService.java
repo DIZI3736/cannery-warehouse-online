@@ -167,7 +167,8 @@ public class ExcelService {
                                 .orElse(null);
                     }
 
-                    if (product == null && manufacturer == null && !sameNameProducts.isEmpty()) {
+                    if (product == null && manufacturer == null
+                            && sameNameProducts.stream().anyMatch(existing -> sameManufacturer(existing.getManufacturer(), manufacturer))) {
                         throw new IllegalArgumentException(
                                 "Строка " + (rowIndex + 1) + ": товар \"" + normalizedName
                                         + "\" уже существует. Укажите производителя, чтобы отличить новую позицию."

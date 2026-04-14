@@ -125,7 +125,8 @@ public class ProductService {
             return saved;
         }
 
-        if (normalizedManufacturer == null && !sameNameProducts.isEmpty()) {
+        if (normalizedManufacturer == null
+                && sameNameProducts.stream().anyMatch(existing -> sameManufacturer(existing.getManufacturer(), normalizedManufacturer))) {
             throw new IllegalArgumentException("Товар с таким названием уже существует. Укажите производителя, если это другая позиция.");
         }
 
@@ -163,7 +164,8 @@ public class ProductService {
             throw new IllegalArgumentException("Товар с таким названием и производителем уже существует.");
         }
 
-        if (manufacturer == null && !conflicts.isEmpty()) {
+        if (manufacturer == null
+                && conflicts.stream().anyMatch(product -> sameManufacturer(product.getManufacturer(), manufacturer))) {
             throw new IllegalArgumentException("Товар с таким названием уже есть. Укажите производителя, чтобы различать позиции.");
         }
     }
