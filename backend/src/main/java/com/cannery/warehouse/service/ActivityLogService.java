@@ -5,13 +5,17 @@ import com.cannery.warehouse.model.Product;
 import com.cannery.warehouse.model.User;
 import com.cannery.warehouse.repository.ActivityLogRepository;
 import com.cannery.warehouse.repository.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 @Service
@@ -19,17 +23,96 @@ public class ActivityLogService {
 
     private final ActivityLogRepository activityLogRepository;
     private final UserRepository userRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public ActivityLogService(ActivityLogRepository activityLogRepository, UserRepository userRepository) {
+    public ActivityLogService(ActivityLogRepository activityLogRepository,
+                              UserRepository userRepository,
+                              JdbcTemplate jdbcTemplate) {
         this.activityLogRepository = activityLogRepository;
         this.userRepository = userRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public List<ActivityLog> getRecentLogs(String productName, LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime endDateTime = endDate != null ? endDate.plusDays(1).atStartOfDay().minusNanos(1) : null;
+        String trimmedProductName = productName != null && !productName.isBlank() ? productName.trim() : null;
 
-        return activityLogRepository.findByFilters(productName, startDateTime, endDateTime).stream()
+        String actorNameExpr = textColumnExpression("actor_name");
+        String actorRoleExpr = textColumnExpression("actor_role");
+        String productNameExpr = textColumnExpression("product_name");
+        String actionTypeExpr = textColumnExpression("action_type");
+        String fieldNameExpr = textColumnExpression("field_name");
+        String oldValueExpr = textColumnExpression("old_value");
+        String newValueExpr = textColumnExpression("new_value");
+        String descriptionExpr = textColumnExpression("description");
+
+        StringBuilder sql = new StringBuilder("""
+                SELECT
+                    id,
+                    created_at,
+                    %s AS actor_name,
+                    %s AS actor_role,
+                    product_id,
+                    %s AS product_name,
+                    %s AS action_type,
+                    %s AS field_name,
+                    %s AS old_value,
+                    %s AS new_value,
+                    %s AS description
+                FROM activity_log
+                WHERE 1=1
+                """.formatted(
+                actorNameExpr,
+                actorRoleExpr,
+                productNameExpr,
+                actionTypeExpr,
+                fieldNameExpr,
+                oldValueExpr,
+                newValueExpr,
+                descriptionExpr
+        ));
+
+        List<Object> params = new ArrayList<>();
+        if (trimmedProductName != null) {
+            sql.append(" AND LOWER(COALESCE(").append(productNameExpr).append(", '')) LIKE LOWER(?)");
+            params.add("%" + trimmedProductName + "%");
+        }
+        if (startDateTime != null) {
+            sql.append(" AND created_at >= ?");
+            params.add(startDateTime);
+        }
+        if (endDateTime != null) {
+            sql.append(" AND created_at <= ?");
+            params.add(endDateTime);
+        }
+        sql.append(" ORDER BY created_at DESC LIMIT 100");
+
+        return jdbcTemplate.query(
+                        sql.toString(),
+                        (rs, rowNum) -> {
+                            ActivityLog log = new ActivityLog();
+                            log.setId(rs.getLong("id"));
+
+                            Timestamp createdAt = rs.getTimestamp("created_at");
+                            log.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
+
+                            log.setActorName(rs.getString("actor_name"));
+                            log.setActorRole(rs.getString("actor_role"));
+
+                            long productId = rs.getLong("product_id");
+                            log.setProductId(rs.wasNull() ? null : productId);
+
+                            log.setProductName(rs.getString("product_name"));
+                            log.setActionType(rs.getString("action_type"));
+                            log.setFieldName(rs.getString("field_name"));
+                            log.setOldValue(rs.getString("old_value"));
+                            log.setNewValue(rs.getString("new_value"));
+                            log.setDescription(rs.getString("description"));
+                            return log;
+                        },
+                        params.toArray()
+                ).stream()
                 .filter(log -> !"WRITE_OFF".equalsIgnoreCase(log.getActionType()))
                 .toList();
     }
@@ -101,8 +184,35 @@ public class ActivityLogService {
         if (value == null) {
             return "не указано";
         }
+
         String text = String.valueOf(value).trim();
         return text.isEmpty() ? "не указано" : text;
     }
 
+    private String textColumnExpression(String columnName) {
+        String sqlType = jdbcTemplate.query(
+                """
+                        SELECT data_type
+                        FROM information_schema.columns
+                        WHERE table_name = 'activity_log' AND column_name = ?
+                        """,
+                rs -> rs.next() ? rs.getString("data_type") : null,
+                columnName
+        );
+
+        if (sqlType == null) {
+            return columnName;
+        }
+
+        String normalizedType = sqlType.toLowerCase(Locale.ROOT);
+        if ("bytea".equals(normalizedType)) {
+            return "convert_from(" + columnName + ", 'UTF8')";
+        }
+
+        if (!normalizedType.contains("character") && !"text".equals(normalizedType)) {
+            return columnName + "::text";
+        }
+
+        return columnName;
+    }
 }
