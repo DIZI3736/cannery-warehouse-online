@@ -840,7 +840,7 @@ function App() {
     return ROLE_LABELS[role] || role;
   };
 
-  const authHeader = () => ({ headers: { Authorization: authToken } });
+  const authHeader = () => (authToken ? { headers: { Authorization: authToken } } : {});
 
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -970,9 +970,7 @@ function App() {
 
   const fetchProductStats = useCallback(async (currentToken, ignoreEditingGuard = false, fallbackProducts = []) => {
     const token = currentToken || authToken;
-    if (!token) return;
-
-    const headers = { headers: { Authorization: token } };
+    const headers = token ? { headers: { Authorization: token } } : {};
     const query = buildFilterQueryString();
     const url = `${API_URL}/api/products/stats${query ? `?${query}` : ''}`;
 
@@ -986,8 +984,7 @@ function App() {
 
   const fetchData = useCallback(async (currentToken) => {
     const token = currentToken || authToken;
-    if (!token) return;
-    const headers = { headers: { Authorization: token } };
+    const headers = token ? { headers: { Authorization: token } } : {};
     try {
       const query = buildFilterQueryString();
       const suffix = query ? `?${query}` : '';
@@ -1441,10 +1438,9 @@ function App() {
 
   const fetchActivityLogData = useCallback(async () => {
       const token = authToken;
-      if (!token) return;
       setActivityLogLoading(true);
       try {
-          const headers = { headers: { Authorization: token } };
+          const headers = token ? { headers: { Authorization: token } } : {};
           const params = new URLSearchParams();
           if (journalFilters.productName.trim()) params.set('productName', journalFilters.productName.trim());
           if (journalFilters.startDate) params.set('startDate', journalFilters.startDate);

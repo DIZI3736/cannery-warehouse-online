@@ -147,17 +147,25 @@ public class ExcelService {
                     throw new IllegalArgumentException("\u0421\u0442\u0440\u043e\u043a\u0430 " + (rowIndex + 1) + ": \u043f\u043e\u043b\u0435 '\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435' \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e");
                 }
 
+                Long importId = hasColumn(columns, "id")
+                        ? parseLong(getCell(row, columns, "id", 0))
+                        : null;
                 String manufacturer = hasColumn(columns, "manufacturer")
                         ? normalizeOptionalText(getCellValueAsString(getCell(row, columns, "manufacturer", 8)))
                         : null;
                 String duplicateKey = buildImportKey(normalizedName, manufacturer);
                 Product product = processedProducts.get(duplicateKey);
                 if (product == null) {
+                    if (importId != null && importId > 0) {
+                        product = productRepository.findById(importId).orElse(null);
+                    }
                     List<Product> sameNameProducts = productRepository.findAllByNameIgnoreCaseOrderByIdAsc(normalizedName);
-                    product = sameNameProducts.stream()
-                            .filter(existing -> sameManufacturer(existing.getManufacturer(), manufacturer))
-                            .findFirst()
-                            .orElse(null);
+                    if (product == null) {
+                        product = sameNameProducts.stream()
+                                .filter(existing -> sameManufacturer(existing.getManufacturer(), manufacturer))
+                                .findFirst()
+                                .orElse(null);
+                    }
 
                     if (product == null && manufacturer == null && !sameNameProducts.isEmpty()) {
                         throw new IllegalArgumentException(
@@ -173,7 +181,6 @@ public class ExcelService {
 
                 boolean isNew = product.getId() == null;
                 Product previousState = isNew ? null : copyProduct(product);
-                int currentQuantity = product.getQuantity() != null ? product.getQuantity() : 0;
                 int importedQuantity = parseInteger(
                         getCell(row, columns, "quantity", 3),
                         "\u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e",
@@ -183,7 +190,7 @@ public class ExcelService {
                 );
 
                 product.setName(normalizedName);
-                product.setQuantity(currentQuantity + importedQuantity);
+                product.setQuantity(importedQuantity);
 
                 if (hasColumn(columns, "price")) {
                     product.setPrice(parseDecimal(
@@ -446,6 +453,18 @@ public class ExcelService {
 
     private String normalizeHeader(String value) {
         return value == null ? "" : value.replace(" ", "").toLowerCase(Locale.ROOT);
+    }
+
+    private Long parseLong(Cell cell) {
+        String raw = getCellValueAsString(cell).trim();
+        if (raw.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(raw.replace(".0", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private String buildImportKey(String productName, String manufacturer) {
