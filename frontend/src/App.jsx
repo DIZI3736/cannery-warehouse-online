@@ -766,6 +766,7 @@ function App() {
   const [journalFilters, setJournalFilters] = useState(EMPTY_JOURNAL_FILTERS);
   const [feedbackToast, setFeedbackToast] = useState({ title: '', message: '', tone: 'success', icon: '✓' });
   const pendingSaveRequestsRef = useRef(new Set());
+  const editingReleaseTimeoutRef = useRef(null);
   const passwordInputRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -1070,19 +1071,31 @@ function App() {
   }, [user, fetchData]);
 
   const beginEditing = () => {
+      if (editingReleaseTimeoutRef.current) {
+          window.clearTimeout(editingReleaseTimeoutRef.current);
+          editingReleaseTimeoutRef.current = null;
+      }
       isEditingRef.current = true;
       setIsEditing(true);
   };
 
   const endEditing = () => {
+      if (editingReleaseTimeoutRef.current) {
+          window.clearTimeout(editingReleaseTimeoutRef.current);
+          editingReleaseTimeoutRef.current = null;
+      }
       isEditingRef.current = false;
       setIsEditing(false);
   };
 
   const endEditingLater = () => {
-      setTimeout(() => {
+      if (editingReleaseTimeoutRef.current) {
+          window.clearTimeout(editingReleaseTimeoutRef.current);
+      }
+      editingReleaseTimeoutRef.current = window.setTimeout(() => {
           isEditingRef.current = false;
           setIsEditing(false);
+          editingReleaseTimeoutRef.current = null;
       }, 1000);
   };
 
