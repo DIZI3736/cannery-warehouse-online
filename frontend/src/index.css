@@ -1382,6 +1382,45 @@ body {
     text-align: left;
 }
 
+.journal-date-input-wrap {
+    position: relative;
+}
+
+.journal-date-input-wrap .journal-filter-control {
+    padding-right: 56px;
+}
+
+.journal-date-picker-button {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 12px;
+    background: #e8f0ff;
+    color: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.journal-date-picker-button:hover {
+    background: #dbe8ff;
+}
+
+.journal-date-picker-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .journal-empty-card {
     padding: 20px 22px;
     border-radius: 20px;

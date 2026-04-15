@@ -93,6 +93,14 @@ const journalDateToApi = (value = '') => {
   return `${year}-${month}-${day}`;
 };
 
+const apiDateToJournalInput = (value = '') => {
+  const normalized = String(value || '').trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const [, year, month, day] = match;
+  return `${day}.${month}.${year}`;
+};
+
 const normalizeApiBase = (value) => String(value || '').replace(/\/+$/, '');
 
 const resolvePhotoUrl = (value) => {
@@ -682,28 +690,18 @@ function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClo
               </div>
               <div className="journal-filter-field">
                 <label className="journal-filter-label">Дата с</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="form-control journal-filter-control"
+                <JournalDateInput
                   value={filters.startDate}
                   placeholder="дд.мм.гггг"
-                  maxLength={10}
-                  autoComplete="off"
-                  onChange={(event) => onFilterChange('startDate', normalizeJournalDateInput(event.target.value))}
+                  onChange={(value) => onFilterChange('startDate', value)}
                 />
               </div>
               <div className="journal-filter-field">
                 <label className="journal-filter-label">Дата по</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="form-control journal-filter-control"
+                <JournalDateInput
                   value={filters.endDate}
                   placeholder="дд.мм.гггг"
-                  maxLength={10}
-                  autoComplete="off"
-                  onChange={(event) => onFilterChange('endDate', normalizeJournalDateInput(event.target.value))}
+                  onChange={(value) => onFilterChange('endDate', value)}
                 />
               </div>
             </div>
@@ -761,6 +759,53 @@ function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClo
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function JournalDateInput({ value, placeholder, onChange }) {
+  const pickerRef = useRef(null);
+
+  const openPicker = () => {
+    const picker = pickerRef.current;
+    if (!picker) return;
+    if (typeof picker.showPicker === 'function') {
+      picker.showPicker();
+      return;
+    }
+    picker.focus();
+    picker.click();
+  };
+
+  return (
+    <div className="journal-date-input-wrap">
+      <input
+        type="text"
+        inputMode="numeric"
+        className="form-control journal-filter-control"
+        value={value}
+        placeholder={placeholder}
+        maxLength={10}
+        autoComplete="off"
+        onChange={(event) => onChange(normalizeJournalDateInput(event.target.value))}
+      />
+      <button
+        type="button"
+        className="journal-date-picker-button"
+        onClick={openPicker}
+        aria-label="Открыть календарь"
+      >
+        📅
+      </button>
+      <input
+        ref={pickerRef}
+        type="date"
+        className="journal-date-picker-native"
+        tabIndex={-1}
+        aria-hidden="true"
+        value={journalDateToApi(value)}
+        onChange={(event) => onChange(apiDateToJournalInput(event.target.value))}
+      />
     </div>
   );
 }
