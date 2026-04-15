@@ -1378,6 +1378,8 @@ body {
     border-color: #d8e3ef !important;
     background: #fbfdff !important;
     box-shadow: none !important;
+    direction: ltr;
+    text-align: left;
 }
 
 .journal-empty-card {

@@ -74,6 +74,25 @@ const normalizeOptionalText = (value = '') => {
   return trimmed ? trimmed : '';
 };
 
+const normalizeJournalDateInput = (value = '') => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  if (digits.length <= 2) return day;
+  if (digits.length <= 4) return `${day}.${month}`;
+  return `${day}.${month}.${year}`;
+};
+
+const journalDateToApi = (value = '') => {
+  const normalized = String(value || '').trim();
+  const match = normalized.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return '';
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+};
+
 const normalizeApiBase = (value) => String(value || '').replace(/\/+$/, '');
 
 const resolvePhotoUrl = (value) => {
@@ -664,19 +683,27 @@ function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClo
               <div className="journal-filter-field">
                 <label className="journal-filter-label">Дата с</label>
                 <input
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
                   className="form-control journal-filter-control"
                   value={filters.startDate}
-                  onChange={(event) => onFilterChange('startDate', event.target.value)}
+                  placeholder="дд.мм.гггг"
+                  maxLength={10}
+                  autoComplete="off"
+                  onChange={(event) => onFilterChange('startDate', normalizeJournalDateInput(event.target.value))}
                 />
               </div>
               <div className="journal-filter-field">
                 <label className="journal-filter-label">Дата по</label>
                 <input
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
                   className="form-control journal-filter-control"
                   value={filters.endDate}
-                  onChange={(event) => onFilterChange('endDate', event.target.value)}
+                  placeholder="дд.мм.гггг"
+                  maxLength={10}
+                  autoComplete="off"
+                  onChange={(event) => onFilterChange('endDate', normalizeJournalDateInput(event.target.value))}
                 />
               </div>
             </div>
@@ -1488,9 +1515,11 @@ function App() {
       try {
           const headers = token ? { headers: { Authorization: token } } : {};
           const params = new URLSearchParams();
+          const startDate = journalDateToApi(journalFilters.startDate);
+          const endDate = journalDateToApi(journalFilters.endDate);
           if (journalFilters.productName.trim()) params.set('productName', journalFilters.productName.trim());
-          if (journalFilters.startDate) params.set('startDate', journalFilters.startDate);
-          if (journalFilters.endDate) params.set('endDate', journalFilters.endDate);
+          if (startDate) params.set('startDate', startDate);
+          if (endDate) params.set('endDate', endDate);
           const query = params.toString();
           const logsRes = await axios.get(`${API_URL}/api/activity-logs${query ? `?${query}` : ''}`, headers);
           const visibleLogs = (logsRes.data || []).filter((log) => !shouldHideJournalEntry(log));
