@@ -853,6 +853,8 @@ function App() {
     });
   };
 
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   const login = async (e) => {
     if (e) e.preventDefault();
     
@@ -876,7 +878,38 @@ function App() {
     const token = 'Basic ' + btoa(encodeURIComponent(finalUsername + ':' + finalPassword).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
     
     try {
-      const res = await axios.get(API_URL + '/api/auth/me', { headers: { Authorization: token } });
+      let res = null;
+      let lastError = null;
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          res = await axios.get(API_URL + '/api/auth/me', {
+            headers: { Authorization: token },
+            timeout: 15000
+          });
+          break;
+        } catch (attemptError) {
+          lastError = attemptError;
+          const status = attemptError?.response?.status;
+          const shouldRetry =
+            !attemptError?.response ||
+            status === 500 ||
+            status === 502 ||
+            status === 503 ||
+            status === 504;
+
+          if (!shouldRetry || attempt === 3) {
+            throw attemptError;
+          }
+
+          await delay(2000);
+        }
+      }
+
+      if (!res) {
+        throw lastError;
+      }
+
       localStorage.removeItem('token');
       setAuthToken(token);
       setShowPassword(false);
