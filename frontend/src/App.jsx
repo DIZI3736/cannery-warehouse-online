@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { createPortal } from 'react-dom';
 
@@ -43,7 +43,7 @@ const ROLE_LABELS = {
 };
 const JOURNAL_FIELD_LABELS = {
   name: 'Название',
-  quantity: 'Остаток',
+  quantity: 'Количество',
   category: 'Категория',
   photoUrl: 'Фото',
   notes: 'Комментарий',
@@ -55,6 +55,10 @@ const JOURNAL_FIELD_LABELS = {
 };
 const TECHNICAL_JOURNAL_PATTERNS = [/codex/i, /excel duplicate/i, /\?{3,}/];
 const DETAILS_TRACKED_FIELDS = ['qualityStatus', 'packagingType', 'manufacturer', 'brand', 'notes'];
+const STANDALONE_JOURNAL_VIEW = 'journal';
+const JOURNAL_CONTEXT_STORAGE_KEY = 'canneryWarehouseJournalContext';
+const JOURNAL_CONTEXT_TTL_MS = 1000 * 60 * 60 * 8;
+const JOURNAL_RETURN_PARAM = 'fromJournal';
 
 const formatOptionalText = (value, fallback = 'Не указано') => {
   const normalized = typeof value === 'string' ? value.trim() : value;
@@ -99,6 +103,82 @@ const apiDateToJournalInput = (value = '') => {
   if (!match) return '';
   const [, year, month, day] = match;
   return `${day}.${month}.${year}`;
+};
+
+const getCurrentView = () => {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  return params.get('view') || '';
+};
+
+const buildMainAppUrl = (restoreContext = false) => {
+  if (typeof window === 'undefined') return '/';
+  const url = new URL(window.location.href);
+  url.searchParams.delete('view');
+  if (restoreContext) {
+    url.searchParams.set(JOURNAL_RETURN_PARAM, '1');
+  } else {
+    url.searchParams.delete(JOURNAL_RETURN_PARAM);
+  }
+  return url.toString();
+};
+
+const buildStandaloneJournalUrl = () => {
+  if (typeof window === 'undefined') return '/';
+  const url = new URL(window.location.href);
+  url.searchParams.set('view', STANDALONE_JOURNAL_VIEW);
+  return url.toString();
+};
+
+const persistJournalContext = ({ authToken, user, products = [] }) => {
+  if (typeof window === 'undefined' || !authToken || !user) return;
+
+  localStorage.setItem(JOURNAL_CONTEXT_STORAGE_KEY, JSON.stringify({
+    authToken,
+    user,
+    products,
+    savedAt: Date.now()
+  }));
+};
+
+const readJournalContext = () => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = localStorage.getItem(JOURNAL_CONTEXT_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.authToken || !parsed?.user) return null;
+
+    if (parsed.savedAt && Date.now() - parsed.savedAt > JOURNAL_CONTEXT_TTL_MS) {
+      localStorage.removeItem(JOURNAL_CONTEXT_STORAGE_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const clearJournalContext = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(JOURNAL_CONTEXT_STORAGE_KEY);
+};
+
+const shouldRestoreFromJournal = () => {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get(JOURNAL_RETURN_PARAM) === '1';
+};
+
+const clearJournalReturnFlag = () => {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(JOURNAL_RETURN_PARAM)) return;
+  url.searchParams.delete(JOURNAL_RETURN_PARAM);
+  window.history.replaceState({}, '', url.toString());
 };
 
 const normalizeApiBase = (value) => String(value || '').replace(/\/+$/, '');
@@ -260,6 +340,44 @@ const getJournalEventMeta = (log = {}) => {
     title: formatJournalDescription(log.description || 'Изменения по товару'),
     chips: []
   };
+};
+
+const formatJournalDateTime = (value) => {
+  if (!value) return 'Без даты';
+
+  const nextDate = new Date(value);
+  if (Number.isNaN(nextDate.getTime())) return 'Без даты';
+
+  return nextDate.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const normalizeLookupKey = (value = '') => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, ' ');
+
+const getJournalSummary = (log = {}) => {
+  if (log.actionType === 'UPDATE') {
+    return `${formatJournalValue(log.oldValue)} → ${formatJournalValue(log.newValue)}`;
+  }
+
+  return formatJournalDescription(log.description || 'Изменение по товару');
+};
+
+const getJournalProductInfo = (log = {}, productById = new Map(), productByName = new Map()) => {
+  if (log.productId !== null && log.productId !== undefined) {
+    const byId = productById.get(Number(log.productId));
+    if (byId) return byId;
+  }
+
+  const lookupKey = normalizeLookupKey(log.productName);
+  return lookupKey ? productByName.get(lookupKey) || null : null;
 };
 
 function RoundedSelect({
@@ -710,7 +828,7 @@ function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClo
           <section className="journal-section">
             <div className="journal-section-header">
               <h6 className="journal-section-title">История изменений</h6>
-              <span className="journal-section-note">Цена, остаток, категория, карточка товара и другие изменения</span>
+              <span className="journal-section-note">Цена, количество, категория, карточка товара и другие изменения</span>
             </div>
             {loading ? (
               <div className="journal-empty-card">Загрузка журнала...</div>
@@ -810,7 +928,306 @@ function JournalDateInput({ value, placeholder, onChange }) {
   );
 }
 
-function App() {
+function JournalProductHoverCard({ product }) {
+  if (!product) return null;
+
+  return (
+    <div className="journal-product-hovercard" role="tooltip">
+      <div className="journal-product-hoverhead">
+        <div className="journal-product-hoverphoto">
+          <img
+            src={resolvePhotoUrl(product.photoUrl)}
+            alt={product.name || 'Товар'}
+            onError={(event) => { event.currentTarget.src = getProductFallbackImage(product.name); }}
+          />
+        </div>
+        <div className="journal-product-hovercopy">
+          <div className="journal-product-hovertitle">{product.name || 'Без названия'}</div>
+          <div className="journal-product-hovercategory">{normalizeCategoryName(product.categoryName)}</div>
+        </div>
+      </div>
+      <div className="journal-product-hovergrid">
+        <div><span>Качество</span><strong>{formatQualityStatus(product.qualityStatus)}</strong></div>
+        <div><span>Упаковка</span><strong>{formatPackagingType(product.packagingType)}</strong></div>
+        <div><span>Производитель</span><strong>{formatOptionalText(product.manufacturer)}</strong></div>
+        <div><span>Бренд</span><strong>{formatOptionalText(product.brand)}</strong></div>
+      </div>
+      {product.notes && (
+        <div className="journal-product-hovernotes">
+          {product.notes}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StandaloneJournalPage({ authToken, user, initialProducts = [] }) {
+  const [filters, setFilters] = useState(EMPTY_JOURNAL_FILTERS);
+  const [logs, setLogs] = useState([]);
+  const [products, setProducts] = useState(initialProducts);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const handleReturnToCatalog = useCallback((event) => {
+    event.preventDefault();
+
+    if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+      try {
+        window.opener.focus();
+        window.close();
+        return;
+      } catch {
+        // If the browser blocks focus/close, fall back to opening the catalog directly.
+      }
+    }
+
+    window.location.href = buildMainAppUrl(true);
+  }, []);
+
+  const updateFilter = useCallback((field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const headers = useMemo(() => (
+    authToken ? { headers: { Authorization: authToken } } : {}
+  ), [authToken]);
+
+  const productLookup = useMemo(() => {
+    const byId = new Map();
+    const byName = new Map();
+
+    (products || []).forEach((product) => {
+      byId.set(Number(product.id), product);
+      const key = normalizeLookupKey(product.name);
+      if (key && !byName.has(key)) {
+        byName.set(key, product);
+      }
+    });
+
+    return { byId, byName };
+  }, [products]);
+
+  useEffect(() => {
+    if (!authToken) return undefined;
+
+    let cancelled = false;
+
+    const loadProducts = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/products`, headers);
+        if (cancelled) return;
+
+        const nextProducts = (response.data || []).sort((a, b) => Number(a.id) - Number(b.id));
+        setProducts(nextProducts);
+      } catch {
+        // The compact journal can still work with the snapshot passed from the main page.
+      }
+    };
+
+    loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, headers]);
+
+  useEffect(() => {
+    if (!authToken) {
+      setLoading(false);
+      setLogs([]);
+      setError('Не удалось получить доступ к журналу. Откройте его из кабинета менеджера.');
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const timeoutId = window.setTimeout(async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const params = new URLSearchParams();
+        const startDate = journalDateToApi(filters.startDate);
+        const endDate = journalDateToApi(filters.endDate);
+
+        if (filters.productName.trim()) params.set('productName', filters.productName.trim());
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+
+        const query = params.toString();
+        const response = await axios.get(`${API_URL}/api/activity-logs${query ? `?${query}` : ''}`, headers);
+        if (cancelled) return;
+
+        setLogs((response.data || []).filter((log) => !shouldHideJournalEntry(log)));
+      } catch (err) {
+        if (cancelled) return;
+        setLogs([]);
+        setError(err?.response?.data?.message || err?.response?.data || 'Не удалось загрузить журнал изменений');
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [authToken, filters, headers]);
+
+  return (
+    <div className="journal-page">
+      <nav className="journal-page-topbar">
+        <div className="journal-page-brand">FishERP 2.0</div>
+        <div className="journal-page-topbar-actions">
+          <span className="journal-page-user-badge">{ROLE_LABELS[user?.role] || 'Менеджер'}: {user?.fullName || 'Пользователь'}</span>
+          <a className="journal-page-link" href={buildMainAppUrl(true)} onClick={handleReturnToCatalog}>К каталогу</a>
+        </div>
+      </nav>
+
+      <main className="journal-page-shell">
+        <section className="journal-page-hero">
+          <div>
+            <div className="journal-page-kicker">Отдельная вкладка журнала</div>
+            <h1 className="journal-page-title">Журнал изменений</h1>
+            <p className="journal-page-subtitle">Компактная лента по товарам. Наведите на товар, чтобы увидеть бренд, производителя, упаковку и комментарий.</p>
+          </div>
+        </section>
+
+        <section className="journal-page-panel">
+          <div className="journal-section-header">
+            <h6 className="journal-section-title">Фильтры журнала</h6>
+            <span className="journal-section-note">Поиск по названию товара и по диапазону дат</span>
+          </div>
+          <div className="journal-filter-grid">
+            <div className="journal-filter-field journal-filter-field-wide">
+              <label className="journal-filter-label">Название товара</label>
+              <input
+                className="form-control journal-filter-control"
+                value={filters.productName}
+                placeholder="Например: Печень трески"
+                onChange={(event) => updateFilter('productName', event.target.value)}
+              />
+            </div>
+            <div className="journal-filter-field">
+              <label className="journal-filter-label">Дата с</label>
+              <JournalDateInput
+                value={filters.startDate}
+                placeholder="дд.мм.гггг"
+                onChange={(value) => updateFilter('startDate', value)}
+              />
+            </div>
+            <div className="journal-filter-field">
+              <label className="journal-filter-label">Дата по</label>
+              <JournalDateInput
+                value={filters.endDate}
+                placeholder="дд.мм.гггг"
+                onChange={(value) => updateFilter('endDate', value)}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="journal-page-panel">
+          <div className="journal-section-header">
+            <h6 className="journal-section-title">Лента событий</h6>
+            <span className="journal-section-note">Одна запись — одна строка. Всё главное видно сразу, детали товара доступны по наведению.</span>
+          </div>
+
+          {error && (
+            <div className="journal-empty-card">{error}</div>
+          )}
+
+          {!error && loading ? (
+            <div className="journal-empty-card">Загрузка журнала...</div>
+          ) : null}
+
+          {!error && !loading && logs.length === 0 ? (
+            <div className="journal-empty-card">По выбранным фильтрам записей не найдено.</div>
+          ) : null}
+
+          {!error && !loading && logs.length > 0 ? (
+            <div className="journal-line-list">
+              <div className="journal-line-head">
+                <span>Когда</span>
+                <span>Кто</span>
+                <span>Товар</span>
+                <span>Поле</span>
+                <span>Что изменилось</span>
+              </div>
+
+              {logs.map((log) => {
+                const eventMeta = getJournalEventMeta(log);
+                const product = getJournalProductInfo(log, productLookup.byId, productLookup.byName);
+                const productLabel = formatOptionalText(log.productName, 'Без названия');
+                const summary = getJournalSummary(log);
+
+                return (
+                  <article key={log.id} className="journal-line-row">
+                    <div className="journal-line-cell journal-line-cell-time">{formatJournalDateTime(log.createdAt)}</div>
+                    <div className="journal-line-cell journal-line-cell-actor">
+                      <strong>{log.actorName || 'Система'}</strong>
+                      <span>{ROLE_LABELS[log.actorRole] || log.actorRole || 'Система'}</span>
+                    </div>
+                    <div className="journal-line-cell journal-line-cell-product">
+                      <div className="journal-product-hover">
+                        <span className="journal-product-pill" title={productLabel}>{productLabel}</span>
+                        <JournalProductHoverCard product={product} />
+                      </div>
+                    </div>
+                    <div className="journal-line-cell journal-line-cell-field">
+                      <span className={`journal-entry-badge journal-entry-badge-${eventMeta.tone}`}>{eventMeta.badge}</span>
+                    </div>
+                    <div className="journal-line-cell journal-line-cell-summary" title={summary}>
+                      {summary}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function StandaloneJournalRoot() {
+  const [context, setContext] = useState(() => readJournalContext());
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setContext(readJournalContext());
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  if (!context?.authToken || context?.user?.role !== 'SALES_MANAGER') {
+    return (
+      <div className="journal-page journal-page-empty">
+        <div className="journal-page-empty-card">
+          <div className="journal-page-kicker">Журнал менеджера</div>
+          <h1 className="journal-page-title">Откройте журнал из кабинета менеджера</h1>
+          <p className="journal-page-subtitle">Сначала войдите как менеджер, потом нажмите кнопку «Журнал». Тогда новая вкладка получит доступ к данным и откроется как отдельная страница.</p>
+          <a className="journal-page-link journal-page-link-primary" href={buildMainAppUrl(true)}>Вернуться в каталог</a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <StandaloneJournalPage
+      authToken={context.authToken}
+      user={context.user}
+      initialProducts={context.products || []}
+    />
+  );
+}
+
+function MainApp() {
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState('');
   const [username, setUsername] = useState('');
@@ -1010,6 +1427,7 @@ function App() {
 
   const logout = () => {
       localStorage.removeItem('token');
+      clearJournalContext();
       setAuthToken('');
       setUser(null);
       setLoginError('');
@@ -1121,6 +1539,19 @@ function App() {
 
   // Первоначальная загрузка и восстановление сессии
   useEffect(() => {
+    if (shouldRestoreFromJournal()) {
+      const journalContext = readJournalContext();
+
+      if (journalContext?.authToken && journalContext?.user?.role === 'SALES_MANAGER') {
+        setAuthToken(journalContext.authToken);
+        setUser(journalContext.user);
+        clearJournalReturnFlag();
+        return;
+      }
+
+      clearJournalReturnFlag();
+    }
+
     localStorage.removeItem('token');
     setAuthToken('');
     setUser(null);
@@ -1131,6 +1562,12 @@ function App() {
         fetchData();
     }
   }, [user, fetchData]);
+
+  useEffect(() => {
+    if (user?.role === 'SALES_MANAGER' && authToken) {
+      persistJournalContext({ authToken, user, products });
+    }
+  }, [authToken, products, user]);
 
   // Интервал автоматического обновления (5 секунд)
   useEffect(() => {
@@ -1578,7 +2015,13 @@ function App() {
   }, [authToken, journalFilters]);
 
   const openActivityJournal = () => {
-      setActivityLogOpen(true);
+      persistJournalContext({ authToken, user, products });
+      const journalUrl = buildStandaloneJournalUrl();
+      const journalTab = window.open(journalUrl, '_blank');
+
+      if (!journalTab) {
+        window.location.href = journalUrl;
+      }
   };
 
   useEffect(() => {
@@ -1619,12 +2062,12 @@ function App() {
   const currentRole = user?.role || '';
   const roleVisualTitle = {
       STOREKEEPER: 'Живой реестр склада',
-      ACCOUNTANT: 'Финансовый срез остатков',
+      ACCOUNTANT: 'Финансовый срез запасов',
       SALES_MANAGER: 'Журнал и контроль ассортимента'
   };
   const roleVisualDescription = {
       STOREKEEPER: 'Контроль приемки, дефицита и карточек товаров в одном экране.',
-      ACCOUNTANT: 'Стоимость, остатки и цены собраны в одном рабочем представлении.',
+      ACCOUNTANT: 'Стоимость, количество и цены собраны в одном рабочем представлении.',
       SALES_MANAGER: 'История изменений и структура ассортимента собраны в одном представлении.'
   };
 
@@ -1812,7 +2255,7 @@ function App() {
               </div>
 
               <div className="mobile-product-field">
-                  <div className="mobile-product-label">Остаток</div>
+                  <div className="mobile-product-label">Количество</div>
                   {user.role === 'STOREKEEPER' ? (
                       <>
                           <input
@@ -2019,7 +2462,7 @@ function App() {
             <div className="hero-panel-copy">
                 <div className="hero-kicker">Cannery Warehouse</div>
                 <h1 className="hero-title">{roleVisualTitle[user.role] || 'Рабочее пространство склада'}</h1>
-                <p className="hero-text mb-0">{roleVisualDescription[user.role] || 'Актуальные остатки, категории и операции по товарам.'}</p>
+                <p className="hero-text mb-0">{roleVisualDescription[user.role] || 'Актуальное количество, категории и операции по товарам.'}</p>
             </div>
             <div className="hero-badges">
                 {overviewCards.map((card) => (
@@ -2227,7 +2670,7 @@ function App() {
                                 <th style={{width: '40px'}}>Фото</th>
                                 <th>Наименование</th>
                                 <th style={{width: '140px'}} className="d-none d-md-table-cell">Категория</th>
-                                <th style={{width: '80px'}}>Остаток</th>
+                                <th style={{width: '80px'}}>Количество</th>
                                 {user.role !== 'STOREKEEPER' && <th style={{width: '100px'}}>Цена</th>}
                                 <th className="text-end pe-4" style={{width: '190px'}}>Действия</th>
                             </tr>
@@ -2266,7 +2709,7 @@ function App() {
                                             />
                                         ) : renderCategoryBadge(p.categoryName)}
                                     </td>
-                                    <td data-label="Остаток">
+                                    <td data-label="Количество">
                                         {user.role === 'STOREKEEPER' ? (
                                             <div className="product-edit-cell">
                                                 <input type="text" inputMode="numeric" pattern="[0-9]*" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold product-edit-input ${quantityError ? 'product-input-error' : ''}`} 
@@ -2315,6 +2758,16 @@ function App() {
       </div>
     </div>
   );
+}
+
+function App() {
+  const currentView = getCurrentView();
+
+  if (currentView === STANDALONE_JOURNAL_VIEW) {
+    return <StandaloneJournalRoot />;
+  }
+
+  return <MainApp />;
 }
 
 export default App;
