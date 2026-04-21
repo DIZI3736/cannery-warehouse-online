@@ -22,6 +22,9 @@ const EMPTY_NEW_PRODUCT = {
   manufacturer: '',
   brand: ''
 };
+const createEmptyFeedbackToast = () => ({ title: '', message: '', tone: 'success', icon: '\u2713' });
+const createClosedPhotoDialog = () => ({ open: false, product: null, value: '', error: '', loading: false });
+const createClosedDetailsDialog = () => ({ open: false, product: null, initialProduct: null });
 const QUALITY_OPTIONS = [
   { value: '', label: 'Не указан' },
   { value: 'NORMAL', label: 'Норма' },
@@ -1245,23 +1248,46 @@ function MainApp() {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [photoDialog, setPhotoDialog] = useState({ open: false, product: null, value: '', error: '', loading: false });
-  const [detailsDialog, setDetailsDialog] = useState({ open: false, product: null, initialProduct: null });
+  const [photoDialog, setPhotoDialog] = useState(createClosedPhotoDialog);
+  const [detailsDialog, setDetailsDialog] = useState(createClosedDetailsDialog);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsSuccessMessage, setDetailsSuccessMessage] = useState('');
   const [activityLogOpen, setActivityLogOpen] = useState(false);
   const [activityLogs, setActivityLogs] = useState([]);
   const [activityLogLoading, setActivityLogLoading] = useState(false);
   const [journalFilters, setJournalFilters] = useState(EMPTY_JOURNAL_FILTERS);
-  const [feedbackToast, setFeedbackToast] = useState({ title: '', message: '', tone: 'success', icon: '✓' });
+  const [feedbackToast, setFeedbackToast] = useState(createEmptyFeedbackToast);
   const pendingSaveRequestsRef = useRef(new Set());
   const editingReleaseTimeoutRef = useRef(null);
   const passwordInputRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
+  const previousRoleRef = useRef('');
   
   // Реф нужен, чтобы setInterval всегда видел актуальное состояние редактирования
   const isEditingRef = useRef(false);
   useEffect(() => { isEditingRef.current = isEditing; }, [isEditing]);
+
+  const clearFeedbackToast = useCallback(() => {
+    setFeedbackToast(createEmptyFeedbackToast());
+  }, []);
+
+  const resetTransientUiState = useCallback(() => {
+    setLoginError('');
+    setProductError('');
+    setEditingErrorId(null);
+    setEditingErrorField('');
+    setDeleteCandidate(null);
+    setDeleteLoading(false);
+    setPhotoDialog(createClosedPhotoDialog());
+    setDetailsDialog(createClosedDetailsDialog());
+    setDetailsLoading(false);
+    setDetailsSuccessMessage('');
+    setActivityLogOpen(false);
+    setActivityLogs([]);
+    setActivityLogLoading(false);
+    setJournalFilters(EMPTY_JOURNAL_FILTERS);
+    clearFeedbackToast();
+  }, [clearFeedbackToast]);
   useEffect(() => {
     if (!deleteCandidate) return undefined;
 
@@ -1326,6 +1352,17 @@ function MainApp() {
     };
   }, [deleteCandidate, photoDialog.open, detailsDialog.open, activityLogOpen]);
 
+  useEffect(() => {
+    const nextRole = user?.role || '';
+    const prevRole = previousRoleRef.current;
+
+    if (prevRole && prevRole !== nextRole) {
+      resetTransientUiState();
+    }
+
+    previousRoleRef.current = nextRole;
+  }, [resetTransientUiState, user?.role]);
+
   const roleRu = (role) => {
     return ROLE_LABELS[role] || role;
   };
@@ -1335,6 +1372,7 @@ function MainApp() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   const fillLoginRole = (roleLogin) => {
+    resetTransientUiState();
     setUsername(roleLogin);
     setLoginError('');
 
@@ -1361,6 +1399,7 @@ function MainApp() {
         return;
     }
 
+    resetTransientUiState();
     setLoginLoading(true);
     setLoginError('');
     
@@ -1428,6 +1467,7 @@ function MainApp() {
   const logout = () => {
       localStorage.removeItem('token');
       clearJournalContext();
+      resetTransientUiState();
       setAuthToken('');
       setUser(null);
       setLoginError('');
@@ -2038,11 +2078,11 @@ function MainApp() {
     if (!feedbackToast.message) return undefined;
 
     const timeoutId = window.setTimeout(() => {
-      setFeedbackToast({ title: '', message: '', tone: 'success', icon: '✓' });
+      clearFeedbackToast();
     }, 3600);
 
     return () => window.clearTimeout(timeoutId);
-  }, [feedbackToast.message]);
+  }, [clearFeedbackToast, feedbackToast.message]);
 
   useEffect(() => {
     if (!detailsSuccessMessage) return undefined;
@@ -2532,7 +2572,7 @@ function MainApp() {
             message={feedbackToast.message}
             tone={feedbackToast.tone}
             icon={feedbackToast.icon}
-            onClose={() => setFeedbackToast({ title: '', message: '', tone: 'success', icon: '✓' })}
+            onClose={clearFeedbackToast}
         />
 
         {/* ОСНОВНОЙ ФУНКЦИОНАЛ */}

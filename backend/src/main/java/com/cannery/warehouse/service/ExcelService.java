@@ -17,6 +17,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -114,6 +115,7 @@ public class ExcelService {
         }
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void save(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("\u0424\u0430\u0439\u043b \u0434\u043b\u044f \u0438\u043c\u043f\u043e\u0440\u0442\u0430 \u043f\u0443\u0441\u0442");
