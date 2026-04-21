@@ -1258,14 +1258,33 @@ function MainApp() {
   const [journalFilters, setJournalFilters] = useState(EMPTY_JOURNAL_FILTERS);
   const [feedbackToast, setFeedbackToast] = useState(createEmptyFeedbackToast);
   const pendingSaveRequestsRef = useRef(new Set());
+  const autoSaveTimersRef = useRef(new Map());
   const editingReleaseTimeoutRef = useRef(null);
   const passwordInputRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const previousRoleRef = useRef('');
+  const productsRef = useRef([]);
   
   // Реф нужен, чтобы setInterval всегда видел актуальное состояние редактирования
   const isEditingRef = useRef(false);
   useEffect(() => { isEditingRef.current = isEditing; }, [isEditing]);
+  useEffect(() => { productsRef.current = products; }, [products]);
+
+  const getAutoSaveKey = useCallback((productId, field) => `${productId}:${field}`, []);
+
+  const clearAutoSaveTimer = useCallback((productId, field) => {
+    const key = getAutoSaveKey(productId, field);
+    const timeoutId = autoSaveTimersRef.current.get(key);
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      autoSaveTimersRef.current.delete(key);
+    }
+  }, [getAutoSaveKey]);
+
+  const clearAllAutoSaveTimers = useCallback(() => {
+    autoSaveTimersRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    autoSaveTimersRef.current.clear();
+  }, []);
 
   const clearFeedbackToast = useCallback(() => {
     setFeedbackToast(createEmptyFeedbackToast());
@@ -1286,8 +1305,9 @@ function MainApp() {
     setActivityLogs([]);
     setActivityLogLoading(false);
     setJournalFilters(EMPTY_JOURNAL_FILTERS);
+    clearAllAutoSaveTimers();
     clearFeedbackToast();
-  }, [clearFeedbackToast]);
+  }, [clearAllAutoSaveTimers, clearFeedbackToast]);
   useEffect(() => {
     if (!deleteCandidate) return undefined;
 
@@ -1532,6 +1552,11 @@ function MainApp() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    applyProductStats(buildFallbackProductStats(products), true);
+  }, [applyProductStats, buildFallbackProductStats, products, user]);
+
   const fetchProductStats = useCallback(async (currentToken, ignoreEditingGuard = false, fallbackProducts = []) => {
     const token = currentToken || authToken;
     const headers = token ? { headers: { Authorization: token } } : {};
@@ -1728,7 +1753,8 @@ function MainApp() {
     } catch (err) { setProductError(getApiErrorMessage(err, 'Ошибка при сохранении')); }
   };
 
-  const updateProduct = async (p, editedField = '') => {
+  const updateProduct = async (p, editedField = '', options = {}) => {
+      const { keepEditing = false } = options;
       const trimmedName = normalizeProductName(p.name);
       if (!trimmedName) {
           showEditingValidationError('Название товара обязательно', p.id, 'name');
@@ -1751,7 +1777,7 @@ function MainApp() {
       }
       
       const catId = p.category?.id || p.categoryId;
-      const nextProducts = products.map(item => item.id === p.id ? { ...p, name: trimmedName, quantity: qVal, categoryId: catId } : item);
+      const nextProducts = productsRef.current.map(item => item.id === p.id ? { ...item, ...p, name: trimmedName, quantity: qVal, categoryId: catId } : item);
       setProducts(nextProducts);
 
       const productToSend = buildProductPayload({
@@ -1762,9 +1788,22 @@ function MainApp() {
       });
 
       try {
-          await trackPendingSave(axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader()));
-          fetchProductStats(null, true, nextProducts);
-          endEditingLater();
+          const response = await trackPendingSave(axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader()));
+          const savedProduct = response?.data
+              ? {
+                  ...response.data,
+                  categoryId: response.data?.category?.id ?? response.data?.categoryId ?? null,
+                  categoryName: response.data?.category?.name ?? response.data?.categoryName ?? null
+                }
+              : null;
+          const syncedProducts = savedProduct
+              ? productsRef.current.map(item => item.id === p.id ? { ...item, ...savedProduct } : item)
+              : nextProducts;
+          setProducts(syncedProducts);
+          fetchProductStats(null, true, syncedProducts);
+          if (!keepEditing) {
+              endEditingLater();
+          }
           return true;
       } catch (err) { 
           resetEditingWithError(getApiErrorMessage(err, 'Ошибка сохранения'), p.id, editedField);
@@ -1772,7 +1811,8 @@ function MainApp() {
       }
   };
 
-  const updatePrice = async (id, price) => {
+  const updatePrice = async (id, price, options = {}) => {
+      const { keepEditing = false } = options;
       if (price === "" || price === null || price === undefined) {
           showEditingValidationError('Введите цену!', id, 'price');
           return;
@@ -1787,17 +1827,72 @@ function MainApp() {
           return;
       }
 
-      const nextProducts = products.map(item => item.id === id ? { ...item, price: pVal } : item);
+      const nextProducts = productsRef.current.map(item => item.id === id ? { ...item, price: pVal } : item);
       setProducts(nextProducts);
 
       try {
-          await trackPendingSave(axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader()));
-          fetchProductStats(null, true, nextProducts);
-          endEditingLater();
+          const response = await trackPendingSave(axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader()));
+          const savedProduct = response?.data
+              ? {
+                  ...response.data,
+                  categoryId: response.data?.category?.id ?? response.data?.categoryId ?? null,
+                  categoryName: response.data?.category?.name ?? response.data?.categoryName ?? null
+                }
+              : null;
+          const syncedProducts = savedProduct
+              ? productsRef.current.map(item => item.id === id ? { ...item, ...savedProduct } : item)
+              : nextProducts;
+          setProducts(syncedProducts);
+          fetchProductStats(null, true, syncedProducts);
+          if (!keepEditing) {
+              endEditingLater();
+          }
       } catch (err) { 
           resetEditingWithError(getApiErrorMessage(err, 'Ошибка сохранения цены'), id, 'price');
       }
   };
+
+  const scheduleFieldAutoSave = useCallback((productId, field) => {
+      clearAutoSaveTimer(productId, field);
+      const key = getAutoSaveKey(productId, field);
+      const timeoutId = window.setTimeout(() => {
+          autoSaveTimersRef.current.delete(key);
+          const latestProduct = productsRef.current.find(item => item.id === productId);
+          if (!latestProduct) return;
+
+          if (field === 'quantity') {
+              if (latestProduct.quantity === '' || latestProduct.quantity === null || latestProduct.quantity === undefined) {
+                  return;
+              }
+              updateProduct(latestProduct, 'quantity', { keepEditing: true });
+              return;
+          }
+
+          if (field === 'price') {
+              if (latestProduct.price === '' || latestProduct.price === null || latestProduct.price === undefined) {
+                  return;
+              }
+              updatePrice(productId, latestProduct.price, { keepEditing: true });
+          }
+      }, 900);
+
+      autoSaveTimersRef.current.set(key, timeoutId);
+  }, [clearAutoSaveTimer, getAutoSaveKey, updatePrice, updateProduct]);
+
+  const commitFieldImmediately = useCallback((productId, field, rawValue, fallbackProduct = null) => {
+      clearAutoSaveTimer(productId, field);
+      const latestProduct = productsRef.current.find(item => item.id === productId) || fallbackProduct;
+      if (!latestProduct) return;
+
+      if (field === 'quantity') {
+          updateProduct({ ...latestProduct, quantity: rawValue }, 'quantity');
+          return;
+      }
+
+      if (field === 'price') {
+          updatePrice(productId, rawValue);
+      }
+  }, [clearAutoSaveTimer, updatePrice, updateProduct]);
 
   const requestDeleteProduct = (product) => {
       setDeleteCandidate(product);
@@ -1834,6 +1929,10 @@ function MainApp() {
       if (!pendingRequests.length) return;
       await Promise.allSettled(pendingRequests);
   };
+
+  useEffect(() => () => {
+      clearAllAutoSaveTimers();
+  }, [clearAllAutoSaveTimers]);
 
   const exportToExcel = async () => {
     try {
@@ -2128,6 +2227,7 @@ function MainApp() {
 
   const renderProductMeta = (product, compact = false) => {
       const metaItems = [
+          isProductDeficit(product) ? { key: 'deficit', tone: 'meta-chip-deficit', label: 'Дефицит' } : null,
           product.qualityStatus ? { key: 'quality', tone: `meta-chip-${product.qualityStatus.toLowerCase()}`, label: formatQualityStatus(product.qualityStatus) } : null,
           product.packagingType ? { key: 'packaging', tone: 'meta-chip-neutral', label: formatPackagingType(product.packagingType) } : null,
           product.manufacturer ? { key: 'manufacturer', tone: 'meta-chip-muted', label: product.manufacturer } : null,
@@ -2179,6 +2279,13 @@ function MainApp() {
                   tone: 'overview-card-info'
               }
   ];
+
+  const deficitProductIds = useMemo(
+      () => new Set((productStats.deficitItems || []).map(item => item.id)),
+      [productStats.deficitItems]
+  );
+
+  const isProductDeficit = (product) => deficitProductIds.has(product?.id);
 
   const renderEmptyState = () => (
       <div className="catalog-empty animate-in">
@@ -2305,8 +2412,11 @@ function MainApp() {
                               className={`form-control mobile-input product-edit-input ${quantityError ? 'product-input-error' : ''}`}
                               value={product.quantity !== null && product.quantity !== undefined ? product.quantity : ''}
                               onFocus={() => {beginEditing(); clearEditingError();}}
-                              onChange={(e) => setLocalProductState(product.id, { quantity: e.target.value })}
-                              onBlur={(e) => updateProduct({ ...product, quantity: e.target.value }, 'quantity')}
+                              onChange={(e) => {
+                                  setLocalProductState(product.id, { quantity: e.target.value });
+                                  scheduleFieldAutoSave(product.id, 'quantity');
+                              }}
+                              onBlur={(e) => commitFieldImmediately(product.id, 'quantity', e.target.value, product)}
                           />
                           {quantityError && <div className="product-inline-error">{quantityError}</div>}
                       </>
@@ -2326,8 +2436,11 @@ function MainApp() {
                                   className={`form-control mobile-input product-edit-input ${priceError ? 'product-input-error' : ''}`}
                                   value={product.price !== null && product.price !== undefined ? product.price : ''}
                                   onFocus={() => {beginEditing(); clearEditingError();}}
-                                  onChange={(e) => setLocalProductState(product.id, { price: e.target.value })}
-                                  onBlur={(e) => updatePrice(product.id, e.target.value)}
+                                  onChange={(e) => {
+                                      setLocalProductState(product.id, { price: e.target.value });
+                                      scheduleFieldAutoSave(product.id, 'price');
+                                  }}
+                                  onBlur={(e) => commitFieldImmediately(product.id, 'price', e.target.value, product)}
                               />
                               <span className="mobile-currency">₽</span>
                           </div>
@@ -2755,8 +2868,11 @@ function MainApp() {
                                                 <input type="text" inputMode="numeric" pattern="[0-9]*" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold product-edit-input ${quantityError ? 'product-input-error' : ''}`} 
                                                     value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
                                                     onFocus={() => {beginEditing(); clearEditingError();}}
-                                                    onChange={(e) => setLocalProductState(p.id, { quantity: e.target.value })}
-                                                    onBlur={(e) => { updateProduct({...p, quantity: e.target.value}, 'quantity'); }} />
+                                                    onChange={(e) => {
+                                                        setLocalProductState(p.id, { quantity: e.target.value });
+                                                        scheduleFieldAutoSave(p.id, 'quantity');
+                                                    }}
+                                                    onBlur={(e) => { commitFieldImmediately(p.id, 'quantity', e.target.value, p); }} />
                                                 {quantityError && <div className="product-inline-error">{quantityError}</div>}
                                             </div>
                                         ) : (
@@ -2773,8 +2889,11 @@ function MainApp() {
                                                         <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 product-edit-input ${priceError ? 'product-input-error' : ''}`} 
                                                             value={p.price !== null && p.price !== undefined ? p.price : ''} 
                                                             onFocus={() => {beginEditing(); clearEditingError();}}
-                                                            onChange={(e) => setLocalProductState(p.id, { price: e.target.value })}
-                                                            onBlur={(e) => { updatePrice(p.id, e.target.value); }} />
+                                                            onChange={(e) => {
+                                                                setLocalProductState(p.id, { price: e.target.value });
+                                                                scheduleFieldAutoSave(p.id, 'price');
+                                                            }}
+                                                            onBlur={(e) => { commitFieldImmediately(p.id, 'price', e.target.value, p); }} />
                                                         <span className="ms-1 fw-bold">₽</span>
                                                     </div>
                                                     {priceError && <div className="product-inline-error">{priceError}</div>}
