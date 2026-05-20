@@ -3,6 +3,8 @@ import axios from 'axios';
 import { createPortal } from 'react-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+const API_REQUEST_TIMEOUT_MS = 20000;
+const IMAGE_PRELOAD_TIMEOUT_MS = 7000;
 const FALLBACK_IMAGE = 'https://cdn-icons-png.flaticon.com/512/1170/1170628.png';
 const PRODUCT_IMAGE_FALLBACKS = {
   'Шпроты в масле': '/product-images/sprats.jpg',
@@ -56,7 +58,7 @@ const JOURNAL_FIELD_LABELS = {
   brand: 'Бренд',
   price: 'Цена'
 };
-const TECHNICAL_JOURNAL_PATTERNS = [/codex/i, /excel duplicate/i, /\?{3,}/];
+const TECHNICAL_JOURNAL_PATTERNS = [/codex/i, /excel duplicate/i];
 const DETAILS_TRACKED_FIELDS = ['qualityStatus', 'packagingType', 'manufacturer', 'brand', 'notes'];
 const STANDALONE_JOURNAL_VIEW = 'journal';
 const JOURNAL_CONTEXT_STORAGE_KEY = 'canneryWarehouseJournalContext';
@@ -283,6 +285,63 @@ const formatJournalValue = (value) => {
   return normalized && normalized.toLowerCase() !== 'null' ? normalized : 'Не указано';
 };
 
+const isBrokenJournalText = (value = '') => (
+  typeof value === 'string' && /\?{2,}/.test(value)
+);
+
+const getJournalFallbackValue = (fieldName, product = null) => {
+  if (!product) return null;
+
+  switch (fieldName) {
+    case 'name':
+      return product.name;
+    case 'category':
+      return product.categoryName;
+    case 'photoUrl':
+      return product.photoUrl;
+    case 'notes':
+      return product.notes;
+    case 'qualityStatus':
+      return product.qualityStatus;
+    case 'packagingType':
+      return product.packagingType;
+    case 'manufacturer':
+      return product.manufacturer;
+    case 'brand':
+      return product.brand;
+    case 'price':
+      return product.price;
+    case 'quantity':
+      return product.quantity;
+    default:
+      return null;
+  }
+};
+
+const resolveJournalValue = (log = {}, value, product = null) => {
+  const normalized = value === null || value === undefined
+    ? ''
+    : formatJournalDescription(String(value)).trim();
+
+  if (normalized && normalized.toLowerCase() !== 'null' && !isBrokenJournalText(normalized)) {
+    return normalized;
+  }
+
+  return formatJournalValue(getJournalFallbackValue(log.fieldName, product));
+};
+
+const resolveJournalProductName = (log = {}, product = null) => {
+  const normalized = typeof log.productName === 'string'
+    ? formatJournalDescription(log.productName).trim()
+    : '';
+
+  if (normalized && normalized.toLowerCase() !== 'null' && !isBrokenJournalText(normalized)) {
+    return normalized;
+  }
+
+  return formatOptionalText(product?.name, 'Р‘РµР· РЅР°Р·РІР°РЅРёСЏ');
+};
+
 const shouldHideJournalEntry = (log = {}) => {
   const haystack = [
     log.productName,
@@ -381,6 +440,87 @@ const getJournalProductInfo = (log = {}, productById = new Map(), productByName 
 
   const lookupKey = normalizeLookupKey(log.productName);
   return lookupKey ? productByName.get(lookupKey) || null : null;
+};
+
+const buildJournalProductLookup = (products = []) => {
+  const byId = new Map();
+  const byName = new Map();
+
+  (products || []).forEach((product) => {
+    byId.set(Number(product.id), product);
+    const key = normalizeLookupKey(product.name);
+    if (key && !byName.has(key)) {
+      byName.set(key, product);
+    }
+  });
+
+  return { byId, byName };
+};
+
+const getResolvedJournalEventMeta = (log = {}, product = null) => {
+  const productName = resolveJournalProductName(log, product);
+
+  if (log.actionType === 'CREATE') {
+    return {
+      badge: 'Новый товар',
+      tone: 'primary',
+      title: `Добавлен товар «${productName}»`,
+      chips: []
+    };
+  }
+
+  if (log.actionType === 'DELETE') {
+    return {
+      badge: 'Удаление',
+      tone: 'danger',
+      title: `Удален товар «${productName}»`,
+      chips: []
+    };
+  }
+
+  if (log.actionType === 'UPDATE') {
+    const fieldLabel = JOURNAL_FIELD_LABELS[log.fieldName] || 'Изменение';
+    const tone = log.fieldName === 'price'
+      ? 'accent'
+      : log.fieldName === 'quantity'
+        ? 'primary'
+        : 'neutral';
+
+    return {
+      badge: fieldLabel,
+      tone,
+      title: `Обновлено поле «${fieldLabel}» у товара «${productName}»`,
+      chips: [
+        `Было: ${resolveJournalValue(log, log.oldValue, product)}`,
+        `Стало: ${resolveJournalValue(log, log.newValue, product)}`
+      ]
+    };
+  }
+
+  return {
+    badge: 'Событие',
+    tone: 'neutral',
+    title: formatJournalDescription(log.description || 'Изменения по товару'),
+    chips: []
+  };
+};
+
+const getResolvedJournalSummary = (log = {}, product = null) => {
+  const productName = resolveJournalProductName(log, product);
+
+  if (log.actionType === 'CREATE') {
+    return `Добавлен новый товар «${productName}»`;
+  }
+
+  if (log.actionType === 'DELETE') {
+    return `Удален товар «${productName}»`;
+  }
+
+  if (log.actionType === 'UPDATE') {
+    return `${resolveJournalValue(log, log.oldValue, product)} -> ${resolveJournalValue(log, log.newValue, product)}`;
+  }
+
+  return formatJournalDescription(log.description || 'Изменение по товару');
 };
 
 function RoundedSelect({
@@ -619,7 +759,7 @@ function PhotoLinkDialog({ open, value, error, loading, onChange, onCancel, onCo
             Отмена
           </button>
           <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={loading}>
-            {loading ? 'Проверка...' : 'Сохранить'}
+            {loading ? 'Сохранение...' : 'Сохранить'}
           </button>
         </div>
       </div>
@@ -657,16 +797,16 @@ function ProductDetailsDialog({ open, product, canEdit, loading, successMessage,
 
   return (
     <div className="app-modal-backdrop" onClick={loading ? undefined : onCancel}>
-      <div className="app-modal app-modal-wide product-details-modal animate-in" onClick={(event) => event.stopPropagation()}>
-        <div className="app-modal-header">
-          <div>
-            <div className="app-modal-kicker">Карточка товара</div>
-            <h5 className="app-modal-title">{product.name || 'Новая карточка'}</h5>
+        <div className="app-modal app-modal-wide product-details-modal animate-in" onClick={(event) => event.stopPropagation()}>
+          <div className="app-modal-header">
+            <div>
+              <div className="app-modal-kicker">Карточка товара</div>
+              <h5 className="app-modal-title">{product.name || 'Новая карточка'}</h5>
+            </div>
+            <button type="button" className="btn-close" onClick={onCancel} disabled={loading} />
           </div>
-          <button type="button" className="btn-close" onClick={onCancel} disabled={loading} />
-        </div>
 
-        <div className="product-details-shell">
+          <div className="product-details-shell">
           <div className="product-details-top">
             <div className="product-details-photo-frame">
               <div className="product-details-photo">
@@ -759,8 +899,12 @@ function ProductDetailsDialog({ open, product, canEdit, loading, successMessage,
 
         <div className={`app-modal-actions ${successMessage ? 'app-modal-actions-with-status' : ''}`}>
           {successMessage && (
-            <div className="app-modal-success" role="status" aria-live="polite">
-              Сохранено. {successMessage}
+            <div className="product-details-toast" role="status" aria-live="polite">
+              <span className="product-details-toast-icon">✓</span>
+              <div className="product-details-toast-copy">
+                <div className="product-details-toast-title">Сохранено</div>
+                <div className="product-details-toast-text">{successMessage}</div>
+              </div>
             </div>
           )}
           <div className="app-modal-actions-buttons">
@@ -779,8 +923,10 @@ function ProductDetailsDialog({ open, product, canEdit, loading, successMessage,
   );
 }
 
-function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClose }) {
+function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClose, products = [] }) {
   if (!open) return null;
+
+  const productLookup = buildJournalProductLookup(products);
 
   return (
     <div className="app-modal-backdrop" onClick={onClose}>
@@ -841,7 +987,8 @@ function ActivityLogDialog({ open, logs, loading, filters, onFilterChange, onClo
               <div className="journal-timeline">
                 {logs.map(log => (
                   (() => {
-                    const eventMeta = getJournalEventMeta(log);
+                    const product = getJournalProductInfo(log, productLookup.byId, productLookup.byName);
+                    const eventMeta = getResolvedJournalEventMeta(log, product);
 
                     return (
                       <article key={log.id} className="journal-entry">
@@ -992,23 +1139,12 @@ function StandaloneJournalPage({ authToken, user, initialProducts = [] }) {
   }, []);
 
   const headers = useMemo(() => (
-    authToken ? { headers: { Authorization: authToken } } : {}
+    authToken
+      ? { headers: { Authorization: authToken }, timeout: API_REQUEST_TIMEOUT_MS }
+      : { timeout: API_REQUEST_TIMEOUT_MS }
   ), [authToken]);
 
-  const productLookup = useMemo(() => {
-    const byId = new Map();
-    const byName = new Map();
-
-    (products || []).forEach((product) => {
-      byId.set(Number(product.id), product);
-      const key = normalizeLookupKey(product.name);
-      if (key && !byName.has(key)) {
-        byName.set(key, product);
-      }
-    });
-
-    return { byId, byName };
-  }, [products]);
+  const productLookup = useMemo(() => buildJournalProductLookup(products), [products]);
 
   useEffect(() => {
     if (!authToken) return undefined;
@@ -1161,10 +1297,10 @@ function StandaloneJournalPage({ authToken, user, initialProducts = [] }) {
               </div>
 
               {logs.map((log) => {
-                const eventMeta = getJournalEventMeta(log);
                 const product = getJournalProductInfo(log, productLookup.byId, productLookup.byName);
-                const productLabel = formatOptionalText(log.productName, 'Без названия');
-                const summary = getJournalSummary(log);
+                const eventMeta = getResolvedJournalEventMeta(log, product);
+                const productLabel = resolveJournalProductName(log, product);
+                const summary = getResolvedJournalSummary(log, product);
 
                 return (
                   <article key={log.id} className="journal-line-row">
@@ -1559,7 +1695,9 @@ function MainApp() {
 
   const fetchProductStats = useCallback(async (currentToken, ignoreEditingGuard = false, fallbackProducts = []) => {
     const token = currentToken || authToken;
-    const headers = token ? { headers: { Authorization: token } } : {};
+    const headers = token
+      ? { headers: { Authorization: token }, timeout: API_REQUEST_TIMEOUT_MS }
+      : { timeout: API_REQUEST_TIMEOUT_MS };
     const query = buildFilterQueryString();
     const url = `${API_URL}/api/products/stats${query ? `?${query}` : ''}`;
 
@@ -1573,7 +1711,9 @@ function MainApp() {
 
   const fetchData = useCallback(async (currentToken) => {
     const token = currentToken || authToken;
-    const headers = token ? { headers: { Authorization: token } } : {};
+    const headers = token
+      ? { headers: { Authorization: token }, timeout: API_REQUEST_TIMEOUT_MS }
+      : { timeout: API_REQUEST_TIMEOUT_MS };
     try {
       const query = buildFilterQueryString();
       const suffix = query ? `?${query}` : '';
@@ -1674,6 +1814,8 @@ function MainApp() {
   };
 
   const getApiErrorMessage = (err, fallback) => {
+      if (err?.code === 'ECONNABORTED') return 'Сервер не ответил вовремя. Попробуйте ещё раз.';
+      if (err?.message === 'Network Error') return 'Не удалось связаться с сервером. Проверьте backend и попробуйте снова.';
       const data = err?.response?.data;
       if (typeof data === 'string' && data.trim()) return data;
       if (data?.message) return data.message;
@@ -1747,7 +1889,10 @@ function MainApp() {
     if (parseInt(newProduct.quantity, 10) < 0) return setProductError('Количество не может быть отрицательным!');
 
     try {
-      await axios.post(API_URL + '/api/products', buildProductPayload(newProduct), authHeader());
+      await axios.post(API_URL + '/api/products', buildProductPayload(newProduct), {
+        ...authHeader(),
+        timeout: API_REQUEST_TIMEOUT_MS
+      });
       setNewProduct(EMPTY_NEW_PRODUCT);
       fetchData();
     } catch (err) { setProductError(getApiErrorMessage(err, 'Ошибка при сохранении')); }
@@ -1788,7 +1933,10 @@ function MainApp() {
       });
 
       try {
-          const response = await trackPendingSave(axios.put(`${API_URL}/api/products/${p.id}`, productToSend, authHeader()));
+          const response = await trackPendingSave(axios.put(`${API_URL}/api/products/${p.id}`, productToSend, {
+              ...authHeader(),
+              timeout: API_REQUEST_TIMEOUT_MS
+          }));
           const savedProduct = response?.data
               ? {
                   ...response.data,
@@ -1831,7 +1979,10 @@ function MainApp() {
       setProducts(nextProducts);
 
       try {
-          const response = await trackPendingSave(axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, authHeader()));
+          const response = await trackPendingSave(axios.put(`${API_URL}/api/products/${id}/price`, { price: pVal }, {
+              ...authHeader(),
+              timeout: API_REQUEST_TIMEOUT_MS
+          }));
           const savedProduct = response?.data
               ? {
                   ...response.data,
@@ -1908,7 +2059,10 @@ function MainApp() {
 
       setDeleteLoading(true);
       try {
-          await axios.delete(`${API_URL}/api/products/${deleteCandidate.id}`, authHeader());
+        await axios.delete(`${API_URL}/api/products/${deleteCandidate.id}`, {
+            ...authHeader(),
+            timeout: API_REQUEST_TIMEOUT_MS
+        });
           setDeleteCandidate(null);
           fetchData();
       } catch (err) {
@@ -1943,6 +2097,7 @@ function MainApp() {
         await fetchData();
         const response = await axios.get(`${API_URL}/api/products/export`, {
             ...authHeader(),
+            timeout: API_REQUEST_TIMEOUT_MS,
             responseType: 'blob'
         });
         const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -1962,7 +2117,8 @@ function MainApp() {
     formData.append('file', file);
     try {
         await axios.post(`${API_URL}/api/products/import`, formData, {
-            headers: { 
+            timeout: API_REQUEST_TIMEOUT_MS,
+            headers: {
                 ...authHeader().headers,
                 'Content-Type': 'multipart/form-data'
             }
@@ -1993,6 +2149,7 @@ function MainApp() {
       formData.append('file', file);
       try {
           const res = await axios.post(`${API_URL}/api/products/upload`, formData, {
+              timeout: API_REQUEST_TIMEOUT_MS,
               headers: { ...authHeader().headers, 'Content-Type': 'multipart/form-data' }
           });
           const photoUrl = API_URL + res.data;
@@ -2038,7 +2195,7 @@ function MainApp() {
   };
   const preloadImage = (url) => new Promise((resolve, reject) => {
       const image = new Image();
-      const timeoutId = window.setTimeout(() => reject(new Error('timeout')), 7000);
+      const timeoutId = window.setTimeout(() => reject(new Error('timeout')), IMAGE_PRELOAD_TIMEOUT_MS);
       image.onload = () => {
           window.clearTimeout(timeoutId);
           resolve(url);
@@ -2047,6 +2204,8 @@ function MainApp() {
           window.clearTimeout(timeoutId);
           reject(new Error('image-error'));
       };
+      image.decoding = 'async';
+      image.referrerPolicy = 'no-referrer';
       image.src = url;
   });
 
@@ -2057,23 +2216,33 @@ function MainApp() {
           return;
       }
 
+      const previewUrl = resolvePhotoUrl(normalizedUrl);
+      const photoUrlToSave = /^https?:\/\//i.test(normalizedUrl) ? previewUrl : normalizedUrl;
       setPhotoDialog(prev => ({ ...prev, error: '', loading: true }));
 
       try {
-          await preloadImage(normalizedUrl);
+          await preloadImage(previewUrl);
       } catch (err) {
           setPhotoDialog(prev => ({
               ...prev,
               loading: false,
-              error: 'Не удалось загрузить изображение. Пока используйте другую ссылку или загрузите файл.'
+              error: 'Не удалось проверить изображение. Ссылка может быть недоступна или сервер блокирует предпросмотр.'
           }));
           return;
       }
 
       if (photoDialog.product) {
-          await updateProduct({ ...photoDialog.product, photoUrl: normalizedUrl }, 'photoUrl');
+          const saved = await updateProduct({ ...photoDialog.product, photoUrl: photoUrlToSave }, 'photoUrl');
+          if (!saved) {
+              setPhotoDialog(prev => ({
+                  ...prev,
+                  loading: false,
+                  error: 'Не удалось сохранить ссылку на фото. Проверьте сервер и попробуйте ещё раз.'
+              }));
+              return;
+          }
       } else {
-          setNewProduct(prev => ({ ...prev, photoUrl: normalizedUrl }));
+          setNewProduct(prev => ({ ...prev, photoUrl: photoUrlToSave }));
           setProductError('');
       }
 
@@ -2106,21 +2275,15 @@ function MainApp() {
       setDetailsLoading(true);
       try {
           const isSaved = await updateProduct({ ...detailsDialog.product }, 'details');
-          if (isSaved) {
-              const successMessage = buildDetailsSaveMessage(detailsDialog.initialProduct, detailsDialog.product);
-              clearDetailsSuccessState();
-              setDetailsSuccessMessage(successMessage);
-              setFeedbackToast({
-                  title: 'Карточка сохранена',
-                  message: successMessage,
-                  tone: 'success',
-                  icon: '✓'
-              });
-              setDetailsDialog(prev => ({
-                  ...prev,
-                  initialProduct: { ...prev.product }
-              }));
-          }
+            if (isSaved) {
+                const successMessage = buildDetailsSaveMessage(detailsDialog.initialProduct, detailsDialog.product);
+                clearDetailsSuccessState();
+                setDetailsSuccessMessage(successMessage);
+                setDetailsDialog(prev => ({
+                    ...prev,
+                    initialProduct: { ...prev.product }
+                }));
+            }
       } finally {
           setDetailsLoading(false);
       }
@@ -2366,6 +2529,7 @@ function MainApp() {
                       <input
                           className={`form-control border-0 bg-transparent fw-bold mobile-product-name-input product-edit-input ${nameError ? 'product-input-error' : ''}`}
                           value={product.name}
+                          placeholder="Название товара"
                           onFocus={() => {beginEditing(); clearEditingError();}}
                           onChange={(e) => setLocalProductState(product.id, { name: normalizeProductName(e.target.value) })}
                           onBlur={(e) => updateProduct({ ...product, name: e.target.value }, 'name')}
@@ -2411,6 +2575,7 @@ function MainApp() {
                               pattern="[0-9]*"
                               className={`form-control mobile-input product-edit-input ${quantityError ? 'product-input-error' : ''}`}
                               value={product.quantity !== null && product.quantity !== undefined ? product.quantity : ''}
+                              placeholder="Кол-во"
                               onFocus={() => {beginEditing(); clearEditingError();}}
                               onChange={(e) => {
                                   setLocalProductState(product.id, { quantity: e.target.value });
@@ -2435,6 +2600,7 @@ function MainApp() {
                                   min="0"
                                   className={`form-control mobile-input product-edit-input ${priceError ? 'product-input-error' : ''}`}
                                   value={product.price !== null && product.price !== undefined ? product.price : ''}
+                                  placeholder="Цена"
                                   onFocus={() => {beginEditing(); clearEditingError();}}
                                   onChange={(e) => {
                                       setLocalProductState(product.id, { price: e.target.value });
@@ -2476,6 +2642,7 @@ function MainApp() {
                 className="form-control rounded-3"
                 value={username}
                 name="warehouse-login"
+                placeholder="Введите логин"
                 autoCapitalize="none"
                 autoCorrect="off"
                 autoComplete="off"
@@ -2493,6 +2660,7 @@ function MainApp() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   name="warehouse-passcode"
+                  placeholder="Введите пароль"
                   autoCapitalize="none"
                   autoCorrect="off"
                   autoComplete="new-password"
@@ -2597,6 +2765,7 @@ function MainApp() {
         logs={activityLogs}
         loading={activityLogLoading}
         filters={journalFilters}
+        products={products}
         onFilterChange={updateJournalFilter}
         onClose={() => setActivityLogOpen(false)}
       />
@@ -2842,6 +3011,7 @@ function MainApp() {
                                              <div className="product-edit-cell">
                                                  <input className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 text-primary product-edit-input product-name-input ${nameError ? 'product-input-error' : ''}`} 
                                                  value={p.name} 
+                                                 placeholder="Название товара"
                                                 onFocus={() => {beginEditing(); clearEditingError();}}
                                                 onChange={(e) => setLocalProductState(p.id, { name: normalizeProductName(e.target.value) })}
                                                  onBlur={(e) => { updateProduct({...p, name: e.target.value}, 'name'); }} />
@@ -2867,6 +3037,7 @@ function MainApp() {
                                             <div className="product-edit-cell">
                                                 <input type="text" inputMode="numeric" pattern="[0-9]*" className={`form-control form-control-sm w-100 border-0 bg-light fw-bold product-edit-input ${quantityError ? 'product-input-error' : ''}`} 
                                                     value={p.quantity !== null && p.quantity !== undefined ? p.quantity : ''} 
+                                                    placeholder="Кол-во"
                                                     onFocus={() => {beginEditing(); clearEditingError();}}
                                                     onChange={(e) => {
                                                         setLocalProductState(p.id, { quantity: e.target.value });
@@ -2888,6 +3059,7 @@ function MainApp() {
                                                     <div className="d-flex align-items-center">
                                                         <input type="number" min="0" className={`form-control form-control-sm border-0 bg-transparent fw-bold p-0 product-edit-input ${priceError ? 'product-input-error' : ''}`} 
                                                             value={p.price !== null && p.price !== undefined ? p.price : ''} 
+                                                            placeholder="Цена"
                                                             onFocus={() => {beginEditing(); clearEditingError();}}
                                                             onChange={(e) => {
                                                                 setLocalProductState(p.id, { price: e.target.value });

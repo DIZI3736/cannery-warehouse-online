@@ -38,29 +38,34 @@ public class ActivityLogService {
         LocalDateTime endDateTime = endDate != null ? endDate.plusDays(1).atStartOfDay().minusNanos(1) : null;
         String trimmedProductName = productName != null && !productName.isBlank() ? productName.trim() : null;
 
-        String actorNameExpr = textColumnExpression("actor_name");
-        String actorRoleExpr = textColumnExpression("actor_role");
-        String productNameExpr = textColumnExpression("product_name");
-        String actionTypeExpr = textColumnExpression("action_type");
-        String fieldNameExpr = textColumnExpression("field_name");
-        String oldValueExpr = textColumnExpression("old_value");
-        String newValueExpr = textColumnExpression("new_value");
-        String descriptionExpr = textColumnExpression("description");
+        boolean isMysql = Boolean.TRUE.equals(jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<Boolean>) connection ->
+                connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("mysql")
+        ));
+
+        String actorNameExpr = textColumnExpression("al", "actor_name", isMysql);
+        String actorRoleExpr = textColumnExpression("al", "actor_role", isMysql);
+        String productNameExpr = textColumnExpression("al", "product_name", isMysql);
+        String actionTypeExpr = textColumnExpression("al", "action_type", isMysql);
+        String fieldNameExpr = textColumnExpression("al", "field_name", isMysql);
+        String oldValueExpr = textColumnExpression("al", "old_value", isMysql);
+        String newValueExpr = textColumnExpression("al", "new_value", isMysql);
+        String descriptionExpr = textColumnExpression("al", "description", isMysql);
 
         StringBuilder sql = new StringBuilder("""
                 SELECT
-                    id,
-                    created_at,
+                    al.id,
+                    al.created_at,
                     %s AS actor_name,
                     %s AS actor_role,
-                    product_id,
+                    al.product_id,
                     %s AS product_name,
                     %s AS action_type,
                     %s AS field_name,
                     %s AS old_value,
                     %s AS new_value,
                     %s AS description
-                FROM activity_log
+                FROM activity_log al
+                LEFT JOIN product p ON al.product_id = p.id
                 WHERE 1=1
                 """.formatted(
                 actorNameExpr,
@@ -75,18 +80,20 @@ public class ActivityLogService {
 
         List<Object> params = new ArrayList<>();
         if (trimmedProductName != null) {
-            sql.append(" AND LOWER(COALESCE(").append(productNameExpr).append(", '')) LIKE LOWER(?)");
+            sql.append(" AND (LOWER(COALESCE(").append(productNameExpr).append(", '')) LIKE LOWER(?)");
+            sql.append(" OR LOWER(COALESCE(p.name, '')) LIKE LOWER(?))");
+            params.add("%" + trimmedProductName + "%");
             params.add("%" + trimmedProductName + "%");
         }
         if (startDateTime != null) {
-            sql.append(" AND created_at >= ?");
+            sql.append(" AND al.created_at >= ?");
             params.add(startDateTime);
         }
         if (endDateTime != null) {
-            sql.append(" AND created_at <= ?");
+            sql.append(" AND al.created_at <= ?");
             params.add(endDateTime);
         }
-        sql.append(" ORDER BY created_at DESC LIMIT 100");
+        sql.append(" ORDER BY al.created_at DESC LIMIT 100");
 
         return jdbcTemplate.query(
                         sql.toString(),
@@ -189,7 +196,12 @@ public class ActivityLogService {
         return text.isEmpty() ? "не указано" : text;
     }
 
-    private String textColumnExpression(String columnName) {
+    private String textColumnExpression(String alias, String columnName, boolean isMysql) {
+        String fullColumn = alias != null && !alias.isEmpty() ? alias + "." + columnName : columnName;
+        if (isMysql) {
+            return fullColumn;
+        }
+
         String sqlType = jdbcTemplate.query(
                 """
                         SELECT data_type
@@ -201,18 +213,18 @@ public class ActivityLogService {
         );
 
         if (sqlType == null) {
-            return columnName;
+            return fullColumn;
         }
 
         String normalizedType = sqlType.toLowerCase(Locale.ROOT);
         if ("bytea".equals(normalizedType)) {
-            return "convert_from(" + columnName + ", 'UTF8')";
+            return "convert_from(" + fullColumn + ", 'UTF8')";
         }
 
-        if (!normalizedType.contains("character") && !"text".equals(normalizedType)) {
-            return columnName + "::text";
+        if (!normalizedType.contains("character") && !normalizedType.contains("char") && !"text".equals(normalizedType)) {
+            return fullColumn + "::text";
         }
 
-        return columnName;
+        return fullColumn;
     }
 }
