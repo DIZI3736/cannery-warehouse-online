@@ -1,7 +1,9 @@
 package com.cannery.warehouse.config;
 
 import com.cannery.warehouse.model.Category;
+import com.cannery.warehouse.model.PackagingType;
 import com.cannery.warehouse.model.Product;
+import com.cannery.warehouse.model.QualityStatus;
 import com.cannery.warehouse.model.Role;
 import com.cannery.warehouse.model.User;
 import com.cannery.warehouse.repository.CategoryRepository;
@@ -13,8 +15,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Random;
 
 @Configuration
@@ -38,15 +38,40 @@ public class DataInitializer {
                 Category inOil = saveCat(categoryRepository, "В масле");
                 Category inTomato = saveCat(categoryRepository, "В томате");
 
-                createProd(productRepository, "Шпроты в масле", inOil, 1000, "145.00", "https://bing.com/th?id=OSK.df5bb4e3cab142643a0fc35d55519b5c");
-                createProd(productRepository, "Килька в томате", inTomato, 50, "85.00", "https://api.e-dostavka.by/UserFiles/images/catalog/Goods/1857/00511857/norm/00511857.n_1.png");
-                createProd(productRepository, "Сайра натуральная", natural, 300, "185.50", "https://ir.ozone.ru/s3/multimedia-k/c1000/6854583164.jpg");
-                createProd(productRepository, "Горбуша паштет", natural, 90, "215.00", "https://ir.ozone.ru/s3/multimedia-1-r/c1000/7085548503.jpg");
-                createProd(productRepository, "Печень трески", natural, 45, "450.00", "https://ir.ozone.ru/s3/multimedia-1-8/c1000/7042638248.jpg");
-                createProd(productRepository, "Скумбрия в масле", inOil, 1400, "165.00", "https://images.satu.kz/165531802_konservy-skumbriya-v.jpg");
-                createProd(productRepository, "Тунец (куски)", natural, 110, "195.00", "https://api.e-dostavka.by/UserFiles/images/catalog/Goods/7428/01497428/norm/01497428.n_1.png");
-                createProd(productRepository, "Сардины в масле", inOil, 200, "125.00", "https://tse4.mm.bing.net/th/id/OIP._cRPGWpfmn7YunKLcU1QRwHaEU?rs=1&pid=ImgDetMain&o=7&rm=3");
-                syncMissingPrices(productRepository);
+                createProd(productRepository, "Шпроты в масле", inOil, 72, "79.90",
+                        "/api/products/photos/d9880dd1-130f-4c69-a628-d57fcf9da050_шпроты в масле.jpg",
+                        "Популярная позиция для витрины.", QualityStatus.NORMAL, PackagingType.CANS,
+                        "Беринг", "Рыбное меню");
+                createProd(productRepository, "Килька в томате", null, 145, "96.50",
+                        "https://irecommend.ru/sites/default/files/product-images/10297/bP5uIVsUczg80radKJOOxQ.jpg",
+                        null, null, PackagingType.CANS, "белдруг", "злой");
+                createProd(productRepository, "Сайра натуральная", natural, 228, "112.00",
+                        "https://cdn.27.ua/799/a2/2e/1548846_1.jpeg",
+                        null, null, PackagingType.CANS, "Морской берег", null);
+                createProd(productRepository, "Горбуша паштет", natural, 317, "138.40",
+                        "https://ir.ozone.ru/s3/multimedia-1-r/c1000/7085548503.jpg",
+                        "Нежная консистенция, держать отдельно от деформированной тары.\nп\nп\nп",
+                        QualityStatus.REVIEW, PackagingType.PACKAGES, "Северный улов", "Домашний паштет");
+                createProd(productRepository, "Печень трески", natural, 486, "164.90",
+                        "https://ir.ozone.ru/s3/multimedia-1-8/c1000/7042638248.jpg",
+                        "Используется и для розницы, и для внутренней кухни.",
+                        null, PackagingType.CANS, "Белрыба", "Традиция моря");
+                createProd(productRepository, "Скумбрия в масле", inOil, 624, "189.30",
+                        "https://images.satu.kz/165531802_konservy-skumbriya-v.jpg",
+                        null, QualityStatus.NORMAL, PackagingType.CANS, "Беринг", null);
+                createProd(productRepository, "Тунец (куски)", natural, 810, "215.00",
+                        "https://api.e-dostavka.by/UserFiles/images/catalog/Goods/7428/01497428/norm/01497428.n_1.png",
+                        null, QualityStatus.NORMAL, PackagingType.CANS, null, "Океан Лайн");
+                createProd(productRepository, "Сардины в масле", inOil, 1035, "249.90",
+                        "https://tse4.mm.bing.net/th/id/OIP._cRPGWpfmn7YunKLcU1QRwHaEU?rs=1&pid=ImgDetMain&o=7&rm=3",
+                        "Стабильный спрос в рознице.",
+                        null, PackagingType.CANS, "Балтийский берег", "Морской стандарт");
+                createProd(productRepository, "Горбуша натуральная", natural, 1278, "284.50",
+                        null, null, QualityStatus.NORMAL, PackagingType.CANS, "Белрыба", "Морской улов");
+                createProd(productRepository, "Скумбрия в томатном соусе", inTomato, 1496, "329.00",
+                        null, null, QualityStatus.NORMAL, PackagingType.CANS, "Белрыба", "Добрая рыба");
+                createProd(productRepository, "Горбуша паштет", null, 72, "79.90",
+                        null, null, null, null, "Белдруг", null);
             }
 
         };
@@ -82,37 +107,35 @@ public class DataInitializer {
     }
 
     private Category saveCat(CategoryRepository repo, String name) {
-        Category category = new Category();
-        category.setName(name);
-        return repo.save(category);
+        return repo.findByNameIgnoreCase(name).orElseGet(() -> {
+            Category category = new Category();
+            category.setName(name);
+            return repo.save(category);
+        });
     }
 
-    private void createProd(ProductRepository repo, String name, Category category, Integer quantity, String price, String img) {
+    private void createProd(ProductRepository repo,
+                            String name,
+                            Category category,
+                            Integer quantity,
+                            String price,
+                            String img,
+                            String notes,
+                            QualityStatus qualityStatus,
+                            PackagingType packagingType,
+                            String manufacturer,
+                            String brand) {
         Product product = new Product();
         product.setName(name);
         product.setCategory(category);
         product.setQuantity(quantity);
         product.setPrice(new BigDecimal(price));
         product.setPhotoUrl(img);
+        product.setNotes(notes);
+        product.setQualityStatus(qualityStatus);
+        product.setPackagingType(packagingType);
+        product.setManufacturer(manufacturer);
+        product.setBrand(brand);
         repo.save(product);
-    }
-
-    private void syncMissingPrices(ProductRepository repo) {
-        Map<String, BigDecimal> defaultPrices = new LinkedHashMap<>();
-        defaultPrices.put("Шпроты в масле", new BigDecimal("145.00"));
-        defaultPrices.put("Килька в томате", new BigDecimal("85.00"));
-        defaultPrices.put("Сайра натуральная", new BigDecimal("185.50"));
-        defaultPrices.put("Горбуша паштет", new BigDecimal("215.00"));
-        defaultPrices.put("Печень трески", new BigDecimal("450.00"));
-        defaultPrices.put("Скумбрия в масле", new BigDecimal("165.00"));
-        defaultPrices.put("Тунец (куски)", new BigDecimal("195.00"));
-        defaultPrices.put("Сардины в масле", new BigDecimal("125.00"));
-
-        defaultPrices.forEach((name, price) -> repo.findByNameIgnoreCase(name).ifPresent(product -> {
-            if (product.getPrice() == null || product.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
-                product.setPrice(price);
-                repo.save(product);
-            }
-        }));
     }
 }

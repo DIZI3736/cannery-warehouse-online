@@ -45,6 +45,14 @@ body {
     border-radius: 8px;
 }
 
+.form-control::placeholder,
+textarea.form-control::placeholder,
+.password-field-input::placeholder,
+.product-edit-input::placeholder {
+    color: #7f8ea3 !important;
+    opacity: 1;
+}
+
 .form-control:focus, .form-select:focus {
     background-color: var(--bg-input) !important;
     color: var(--text-main) !important;
@@ -698,6 +706,54 @@ body {
     opacity: 0.8;
 }
 
+.product-details-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: min(360px, 100%);
+    margin-left: auto;
+    padding: 14px 16px;
+    border: 1px solid #b9ead8;
+    border-radius: 18px;
+    background: rgba(240, 253, 248, 0.96);
+    box-shadow: 0 18px 40px rgba(15, 118, 110, 0.18);
+    backdrop-filter: blur(8px);
+}
+
+.product-details-toast-icon {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: #14b87a;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.product-details-toast-copy {
+    min-width: 0;
+}
+
+.product-details-toast-title {
+    color: #0f766e;
+    font-size: 0.9rem;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.product-details-toast-text {
+    color: #155e75;
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
 .app-modal-header {
     display: flex;
     justify-content: space-between;
@@ -749,10 +805,16 @@ body {
 }
 
 .app-modal-actions-with-status {
-    justify-content: space-between;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    justify-content: flex-end;
+    align-items: flex-end;
+    flex-direction: column;
     margin-top: 24px;
     padding-top: 18px;
     border-top: 2px solid #d8e3ef;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.96) 22%, #ffffff 100%);
 }
 
 .app-modal-actions-buttons {
@@ -1185,6 +1247,12 @@ body {
     background: #dbc6ff;
     color: #6d28d9;
     border-color: #c8abff;
+}
+
+.meta-chip-deficit {
+    background: #ffe0e0;
+    color: #c92a2a;
+    border-color: #ffc2c2;
 }
 
 .product-meta-note {
@@ -2379,6 +2447,13 @@ body {
         width: min(100%, calc(100vw - 24px));
         padding: 20px 16px 18px;
         border-radius: 28px 28px 20px 20px;
+    }
+
+    .product-details-toast {
+        width: 100%;
+        margin-left: 0;
+        padding: 12px 14px;
+        border-radius: 16px;
     }
 
     .product-details-form-grid {

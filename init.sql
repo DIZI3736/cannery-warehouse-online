@@ -3,9 +3,6 @@
 
 -- 1. Удаление таблиц (для чистого запуска, если нужно)
 -- DROP TABLE IF EXISTS activity_log;
--- DROP TABLE IF EXISTS order_items;
--- DROP TABLE IF EXISTS orders;
--- DROP TABLE IF EXISTS addresses;
 -- DROP TABLE IF EXISTS product;
 -- DROP TABLE IF EXISTS users;
 -- DROP TABLE IF EXISTS categories;
@@ -43,40 +40,7 @@ CREATE TABLE IF NOT EXISTS product (
     CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 
--- 5. Таблица Адресов
-CREATE TABLE IF NOT EXISTS addresses (
-    id BIGSERIAL PRIMARY KEY,
-    address VARCHAR(255),
-    latitude DOUBLE PRECISION,
-    longitude DOUBLE PRECISION,
-    user_id BIGINT,
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- 6. Таблица Заказов
-CREATE TABLE IF NOT EXISTS orders (
-    id BIGSERIAL PRIMARY KEY,
-    created_at TIMESTAMP WITHOUT TIME ZONE,
-    status VARCHAR(50),
-    store_director_id BIGINT,
-    driver_id BIGINT,
-    delivery_address_id BIGINT,
-    CONSTRAINT fk_store_director FOREIGN KEY (store_director_id) REFERENCES users(id),
-    CONSTRAINT fk_driver FOREIGN KEY (driver_id) REFERENCES users(id),
-    CONSTRAINT fk_delivery_address FOREIGN KEY (delivery_address_id) REFERENCES addresses(id)
-);
-
--- 7. Таблица Состава заказа
-CREATE TABLE IF NOT EXISTS order_items (
-    id BIGSERIAL PRIMARY KEY,
-    order_id BIGINT,
-    product_id BIGINT,
-    quantity INT,
-    CONSTRAINT fk_order FOREIGN KEY (order_id) REFERENCES orders(id),
-    CONSTRAINT fk_product FOREIGN KEY (product_id) REFERENCES product(id)
-);
-
--- 8. Таблица журнала изменений
+-- 5. Таблица журнала изменений
 CREATE TABLE IF NOT EXISTS activity_log (
     id BIGSERIAL PRIMARY KEY,
     created_at TIMESTAMP WITHOUT TIME ZONE,
