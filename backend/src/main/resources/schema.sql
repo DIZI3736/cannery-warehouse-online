@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS activity_log (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    created_at TIMESTAMP NULL,
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITHOUT TIME ZONE,
     actor_name VARCHAR(255),
     actor_role VARCHAR(50),
     product_id BIGINT,
